@@ -1,0 +1,241 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  customer
+  receptionist
+  admin
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum RoomStatus {
+  available
+  occupied
+  maintenance
+  cleaning
+}
+
+enum BookingSource {
+  online
+  offline
+}
+
+enum BookingStatus {
+  pending_payment
+  confirmed
+  checked_in
+  checked_out
+  cancelled
+}
+
+enum PaymentMethod {
+  qr_code
+  cash
+  card
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+  refunded
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DEACTIVATE
+  DELETE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id               Int        @id @default(autoincrement()) @map("user_id")
+  fullName         String     @map("full_name") @db.VarChar(100)
+  email            String     @unique @map("email") @db.VarChar(150)
+  phoneNumber      String     @unique @map("phone_number") @db.VarChar(20)
+  passwordHash     String     @map("password_hash") @db.VarChar(255)
+  resetToken       String?    @map("reset_token") @db.VarChar(255)
+  resetTokenExpiry DateTime?  @map("reset_token_expiry")
+  role             UserRole   @default(customer) @map("role")
+  status           UserStatus @default(active) @map("status")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  // relations
+  bookings        Booking[]  @relation("BookingCustomer")
+  createdBookings Booking[]  @relation("BookingCreatedBy")
+  reviews         Review[]
+  auditLogs       AuditLog[]
+
+  @@map("USER")
+}
+
+model RoomType {
+  id          Int      @id @default(autoincrement()) @map("room_type_id")
+  typeName    String   @unique @map("type_name") @db.VarChar(100)
+  description String?  @map("description") @db.Text
+  maxCapacity Int      @map("max_capacity")
+  basePrice   Decimal  @map("base_price") @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // relations
+  rooms     Room[]
+  images    RoomImage[]
+  amenities RoomTypeAmenity[]
+
+  @@map("ROOM_TYPE")
+}
+
+model Room {
+  id           Int        @id @default(autoincrement()) @map("room_id")
+  roomTypeId   Int        @map("room_type_id")
+  roomNumber   String     @unique @map("room_number") @db.VarChar(20)
+  floor        Int?       @map("floor")
+  status       RoomStatus @default(available) @map("status")
+  currentPrice Decimal    @map("current_price") @db.Decimal(12, 2)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // relations
+  roomType RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  @@index([roomTypeId])
+  @@index([status])
+  @@map("ROOM")
+}
+
+model Amenity {
+  id          Int     @id @default(autoincrement()) @map("amenity_id")
+  amenityName String  @unique @map("amenity_name") @db.VarChar(100)
+  description String? @map("description") @db.VarChar(255)
+
+  // relations
+  roomTypes RoomTypeAmenity[]
+
+  @@map("AMENITY")
+}
+
+model RoomTypeAmenity {
+  roomTypeId Int @map("room_type_id")
+  amenityId  Int @map("amenity_id")
+
+  // relations
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([roomTypeId, amenityId])
+  @@index([amenityId])
+  @@map("ROOM_TYPE_AMENITY")
+}
+
+model RoomImage {
+  id           Int      @id @default(autoincrement()) @map("image_id")
+  roomTypeId   Int      @map("room_type_id")
+  imageUrl     String   @map("image_url") @db.VarChar(255)
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // relations
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@index([roomTypeId])
+  @@map("ROOM_IMAGE")
+}
+
+model Booking {
+  id           Int           @id @default(autoincrement()) @map("booking_id")
+  userId       Int           @map("user_id")
+  roomId       Int           @map("room_id")
+  createdBy    Int?          @map("created_by")
+  checkInDate  DateTime      @map("check_in_date") @db.Date
+  checkOutDate DateTime      @map("check_out_date") @db.Date
+  guestCount   Int           @map("guest_count")
+  totalAmount  Decimal       @map("total_amount") @db.Decimal(12, 2)
+  source       BookingSource @default(online) @map("source")
+  status       BookingStatus @default(pending_payment) @map("status")
+  cancelledAt  DateTime?     @map("cancelled_at")
+  cancelReason String?       @map("cancel_reason") @db.VarChar(255)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  // relations
+  customer       User     @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  createdByStaff User?    @relation("BookingCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  payments       Payment[]
+  review         Review?
+
+  @@index([userId])
+  @@index([roomId])
+  @@index([createdBy])
+  @@index([checkInDate, checkOutDate])
+  @@map("BOOKING")
+}
+
+model Payment {
+  id             Int           @id @default(autoincrement()) @map("payment_id")
+  bookingId      Int           @map("booking_id")
+  amount         Decimal       @map("amount") @db.Decimal(12, 2)
+  method         PaymentMethod @map("method")
+  status         PaymentStatus @default(pending) @map("status")
+  transactionRef String?       @unique @map("transaction_ref") @db.VarChar(255)
+  paidAt         DateTime?     @map("paid_at")
+  refundedAt     DateTime?     @map("refunded_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  // relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@map("PAYMENT")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement()) @map("review_id")
+  bookingId Int      @unique @map("booking_id")
+  userId    Int      @map("user_id")
+  rating    Int      @map("rating") @db.TinyInt
+  comment   String?  @map("comment") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("REVIEW")
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement()) @map("log_id")
+  actorId     Int         @map("actor_id")
+  targetTable String      @map("target_table") @db.VarChar(50)
+  targetId    Int         @map("target_id")
+  action      AuditAction @map("action")
+  oldValue    String?     @map("old_value") @db.Text
+  newValue    String?     @map("new_value") @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // relations
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([actorId])
+  @@index([targetTable, targetId])
+  @@map("AUDIT_LOG")
+}

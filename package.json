@@ -1,0 +1,38 @@
+{
+  "name": "hotel-booking",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.1.0",
+    "@types/node-cron": "^3.0.11",
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@tailwindcss/vite": "^4.2.4",
+    "@tanstack/react-query": "^5.100.9",
+    "axios": "^1.16.0",
+    "lucide-react": "^1.14.0",
+    "node-cron": "^4.2.1",
+    "qrcode.react": "^4.2.0",
+    "react-datepicker": "^9.1.0",
+    "react-hook-form": "^7.75.0",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.15.0",
+    "recharts": "^3.8.1",
+    "sonner": "^2.0.7",
+    "tailwindcss": "^4.2.4",
+    "zod": "^4.4.2",
+    "zustand": "^5.0.13"
+  }
+}
