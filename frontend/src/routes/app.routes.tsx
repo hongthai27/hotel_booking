@@ -14,6 +14,8 @@ const BookingPage = lazy(() => import('../pages/customer/BookingPage'));
 const PaymentPage = lazy(() => import('../pages/customer/PaymentPage'));
 const MyBookingsPage = lazy(() => import('../pages/customer/BookingHistoryPage'));
 const AboutPage = lazy(() => import('../pages/customer/AboutPage'));
+const ForgotPasswordPage = lazy(() => import('../pages/customer/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('../pages/customer/ResetPasswordPage'));
 
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
 const BookingDetailPage = lazy(() => import('../pages/admin/BookingDetailPage'));
@@ -63,6 +65,14 @@ const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      {
+        path: '/forgot-password',
+        element: <ForgotPasswordPage />,
+      },
+      {
+        path: '/reset-password',
+        element:<ResetPasswordPage />,
+      },
     ],
   },
   {

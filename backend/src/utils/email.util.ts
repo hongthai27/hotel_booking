@@ -106,3 +106,49 @@ export const sendCancellationEmail = async (
     logger.error(`Loi gui email huy don #${booking.id}`, error);
   }
 };
+
+export const sendResetPasswordEmail = async (
+  email: string,
+  fullName: string,
+  resetLink: string
+): Promise<void> => {
+  await transporter.sendMail({
+    from: env.EMAIL_USER,
+    to: email,
+    subject: '[Hotel Booking] Dat lai mat khau',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:auto">
+        <h2>Xin chao ${fullName},</h2>
+        <p>
+          Chung toi nhan duoc yeu cau dat lai mat khau
+          cho tai khoan cua ban.
+        </p>
+        <p>
+          Nhan vao nut ben duoi de dat mat khau moi.
+          Link co hieu luc trong <strong>15 phut</strong>.
+        </p>
+        <a href="${resetLink}"
+          style="
+            display:inline-block;
+            margin:16px 0;
+            padding:12px 24px;
+            background:#0f4c81;
+            color:#fff;
+            border-radius:8px;
+            text-decoration:none;
+            font-weight:500;
+          "
+        >
+          Dat lai mat khau
+        </a>
+        <p style="color:#888;font-size:12px">
+          Neu ban khong yeu cau dat lai mat khau,
+          hay bo qua email nay.
+          Tai khoan cua ban van an toan.
+        </p>
+      </div>
+    `,
+  }).catch((err) => {
+    logger.error('[Email] sendResetPasswordEmail error:', err);
+  });
+};

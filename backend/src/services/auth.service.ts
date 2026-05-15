@@ -5,7 +5,8 @@ import { AppError } from '../utils/app-error.util';
 import { generateToken } from '../utils/jwt.util';
 import { RegisterDto, LoginDto } from '../validations/auth.schema';
 import { createAuditLog } from '../utils/audit-log.util';
-// import { sendResetPasswordEmail } from '../utils/email.util';
+import { sendResetPasswordEmail } from '../utils/email.util';
+import { env } from '../config/env.config';
 
 const SALT_ROUNDS = 10;
 
@@ -208,10 +209,9 @@ export const forgotPassword = async (email: string): Promise<void> => {
   });
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+  const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
 
-  // TODO: Tích hợp hàm gửi email thực tế tại đây
-  console.log(`[TEST EMAIL] Link đổi mật khẩu: ${resetLink}`);
+  await sendResetPasswordEmail(user.email, user.fullName, resetLink);
 };
 
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {

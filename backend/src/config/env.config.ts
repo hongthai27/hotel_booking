@@ -66,7 +66,13 @@ const envSchema = z.object({
   WEBHOOK_SECRET: z
     .string({ required_error: 'WEBHOOK_SECRET là bắt buộc' })
     .min(16, 'WEBHOOK_SECRET phải có ít nhất 16 ký tự'),
-});
+
+  FRONTEND_URL: z
+    .string({ required_error: 'FRONTEND_URL la bat buoc' })
+    .url('FRONTEND_URL phai la URL hop le')
+    .default('http://localhost:5173'),
+  });
+
 
 const parsed = envSchema.safeParse(process.env);
 

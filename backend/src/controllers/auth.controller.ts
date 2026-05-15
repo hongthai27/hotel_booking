@@ -52,3 +52,21 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
   );
   successResponse(res, updated, 'Cập nhật tài khoản thành công');
 });
+
+export const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+  await authService.forgotPassword(req.body.email);
+  successResponse(
+    res,
+    null,
+    'Neu email ton tai, chung toi da gui link dat lai mat khau'
+  );
+});
+
+export const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  await authService.resetPassword(req.body.token, req.body.password);
+  successResponse(
+    res,
+    null,
+    'Dat lai mat khau thanh cong. Vui long dang nhap.'
+  );
+});

@@ -2,7 +2,9 @@ import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import { validateBody } from '../middlewares/validate.middleware';
 import { authenticateJWT, authorizeRole } from '../middlewares/auth.middleware';
-import { registerSchema, loginSchema } from '../validations/auth.schema';
+import { registerSchema, loginSchema,
+         forgotPasswordSchema, resetPasswordSchema,
+       } from '../validations/auth.schema';
 
 const router = Router();
 
@@ -29,6 +31,20 @@ router.patch(
   authenticateJWT,
   authorizeRole(['admin']),
   authController.updateUser
+);
+
+// ─── Forgot & Reset Password ──────────────────────────────────────────────────
+
+router.post(
+  '/forgot-password',
+  validateBody(forgotPasswordSchema), 
+  authController.forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  validateBody(resetPasswordSchema), 
+  authController.resetPassword
 );
 
 export default router;
