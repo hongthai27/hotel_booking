@@ -1,7 +1,7 @@
 import { prisma } from '../utils/prisma.util';
 
-// Kiem tra ket noi database khi server khoi dong
-// Neu that bai, nem loi de server.ts bat va xu ly
+// Kiểm tra kết nối database khi server khởi động
+// Nếu thất bại, ném lỗi để server.ts bắt và xử lý
 export const testDatabaseConnection = async (): Promise<void> => {
   try {
     await prisma.$connect();
@@ -10,7 +10,7 @@ export const testDatabaseConnection = async (): Promise<void> => {
     console.error('Failed to connect to database:', error);
     throw error;
   } finally {
-    // Dong ket noi sau khi kiem tra, Prisma se tu quan ly pool khi co query
+    // Đóng kết nối sau khi kiểm tra, Prisma sẽ tự quản lý pool khi có query
     await prisma.$disconnect();
   }
 };

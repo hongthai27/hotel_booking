@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import api from '../../services/api';
 
 const schema = z.object({
-  email: z.string().email('Email khong hop le'),
+  email: z.string().email('Email không hợp lệ'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -27,77 +27,86 @@ const ForgotPasswordPage = () => {
     try {
       await api.post('/auth/forgot-password', { email: data.email });
       setSubmitted(true);
-    } catch {
-      toast.error('Co loi xay ra, vui long thu lai sau');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại sau');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 w-full max-w-md">
+    <div className="w-full">
+      
+      {/* HEADER */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-800">Quên mật khẩu</h2>
+        <p className="text-sm text-gray-500 mt-2">Nhập email để nhận link đặt lại mật khẩu</p>
+      </div>
 
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-gray-800 mb-1">
-            Quen mat khau
-          </h1>
-          <p className="text-sm text-gray-500 font-normal">
-            Nhap email de nhan link dat lai mat khau
-          </p>
-        </div>
-
-        {submitted ? (
-          // Success state
-          <div className="flex flex-col gap-4">
-            <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-              <p className="text-sm text-green-700 font-medium mb-1">
-                Kiem tra hop thu cua ban
-              </p>
-              <p className="text-sm text-green-600 font-normal leading-relaxed">
-                Neu email ton tai trong he thong, chung toi da gui link dat lai mat khau.
-                Vui long kiem tra hop thu (ke ca Spam).
-              </p>
-            </div>
-            <Link
-              to="/login"
-              className="text-center text-sm text-primary font-medium hover:underline"
-            >
-              Quay lai dang nhap
+      {submitted ? (
+        /* TRẠNG THÁI GỬI THÀNH CÔNG */
+        <div className="space-y-6">
+          <div className="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
+            <p className="text-sm text-green-700 font-semibold mb-1">
+              Kiểm tra hộp thư của bạn
+            </p>
+            <p className="text-sm text-green-600 leading-relaxed">
+              Chúng tôi đã gửi link đặt lại mật khẩu. Vui lòng kiểm tra hộp thư (kể cả Spam).
+            </p>
+          </div>
+          <div className="text-center">
+            <Link to="/login" className="text-sm font-semibold text-primary hover:underline">
+              Quay lại đăng nhập
             </Link>
           </div>
-        ) : (
-          // Form state
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-gray-500">Email</label>
-              <input
-                type="email"
-                placeholder="example@email.com"
-                {...register('email')}
-                className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full"
-              />
-              {errors.email && (
-                <p className="text-red-500 text-xs">{errors.email.message}</p>
-              )}
-            </div>
+        </div>
+      ) : (
+        /* FORM NHẬP EMAIL */
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              placeholder="example@email.com"
+              {...register('email')}
+              disabled={isSubmitting}
+              className={`w-full border rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors ${
+                errors.email ? 'border-red-500' : 'border-gray-200'
+              }`}
+            />
+            {errors.email && (
+              <p className="text-xs text-red-500">{errors.email.message}</p>
+            )}
+          </div>
 
+          <div className="pt-2 flex flex-col gap-4">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 bg-primary hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+              className="w-full flex items-center justify-center bg-primary hover:bg-primary-dark text-white font-medium rounded-xl px-4 py-3 text-sm transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Dang gui...' : 'Gui link dat lai mat khau'}
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang gửi...
+                </>
+              ) : (
+                'Gửi link đặt lại mật khẩu'
+              )}
             </button>
 
-            <Link
-              to="/login"
-              className="text-center text-sm text-gray-500 hover:text-primary transition-colors"
-            >
-              Quay lai dang nhap
-            </Link>
-          </form>
-        )}
-      </div>
+            <div className="text-center">
+              <Link
+                to="/login"
+                className="text-sm font-medium text-gray-500 hover:text-primary transition-colors"
+              >
+                Quay lại đăng nhập
+              </Link>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   );
 };

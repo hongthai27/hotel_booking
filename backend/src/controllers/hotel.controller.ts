@@ -85,7 +85,7 @@ export const updateRoomStatus = catchAsync(async (req: Request, res: Response) =
 // ── Search ─────────────────────────────────────────────────────────────────────
 
 export const searchAvailable = catchAsync(async (req: Request, res: Response) => {
-  // validateQuery da chay truoc o route, req.query da duoc coerce dung kieu
+  // validateQuery đã chạy trước ở route, req.query đã được coerce đúng kiểu
   const results = await hotelService.searchAvailable(
     req.query as unknown as SearchAvailableDto
   );

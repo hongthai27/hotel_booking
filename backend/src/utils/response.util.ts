@@ -14,12 +14,12 @@ interface SuccessPayload<T> {
   meta?: PaginationMeta;
 }
 
-// Tra ve response thanh cong voi format nhat quan
-// meta chi duoc dinh kem khi co phan trang
+// Trả về response thành công với format nhất quán
+// meta chỉ được đính kèm khi có phân trang
 export const successResponse = <T>(
   res: Response,
   data: T,
-  message: string = 'Thanh cong',
+  message: string = 'Thành công',
   statusCode: number = 200,
   meta?: PaginationMeta
 ): Response<SuccessPayload<T>> => {

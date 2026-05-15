@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner'; 
 
 import { useAuthStore } from '../../stores/authStore';
 import type { RegisterDTO } from '../../types/auth.types';
@@ -13,8 +13,14 @@ const registerSchema = z
     fullName: z.string().min(2, 'Họ và tên phải có ít nhất 2 ký tự'),
     email: z.string().email('Email không hợp lệ'),
     phoneNumber: z.string().regex(/^[0-9]{10,11}$/, 'Số điện thoại phải gồm 10 đến 11 chữ số'),
-    password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
-    confirmPassword: z.string(),
+    password: z
+      .string()
+      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+      .regex(/[a-z]/, 'Phải chứa ít nhất 1 chữ thường')
+      .regex(/[A-Z]/, 'Phải chứa ít nhất 1 chữ hoa')
+      .regex(/[0-9]/, 'Phải chứa ít nhất 1 số')
+      .regex(/[\W_]/, 'Phải chứa ít nhất 1 ký tự đặc biệt'),
+    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Mật khẩu xác nhận không khớp',
@@ -37,6 +43,7 @@ const RegisterPage: React.FC = () => {
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
+    mode: 'onTouched', // Hiện lỗi đỏ ngay khi người dùng nhập sai và blur ra ngoài
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
@@ -125,7 +132,7 @@ const RegisterPage: React.FC = () => {
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="••••••••"
+              placeholder="Nhập mật khẩu"
               {...register('password')}
               disabled={isSubmitting}
               className={`w-full border rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors ${
@@ -141,6 +148,9 @@ const RegisterPage: React.FC = () => {
               {showPassword ? 'Ẩn' : 'Hiện'}
             </button>
           </div>
+          <p className="text-[11px] text-gray-400">
+            * Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
+          </p>
           {errors.password && <span className="text-xs text-red-500">{errors.password.message}</span>}
         </div>
 
@@ -150,7 +160,7 @@ const RegisterPage: React.FC = () => {
           <div className="relative">
             <input
               type={showConfirmPassword ? 'text' : 'password'}
-              placeholder="••••••••"
+              placeholder="Nhập lại mật khẩu"
               {...register('confirmPassword')}
               disabled={isSubmitting}
               className={`w-full border rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors ${

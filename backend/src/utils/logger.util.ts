@@ -7,18 +7,18 @@ const formatMessage = (level: string, message: string): string => {
   return `[${timestamp}] [${level}] ${message}`;
 };
 
-// Chi log o development, bo qua o production de giam noise
+// Chỉ log ở development, bỏ qua ở production để giảm noise
 const info = (message: string): void => {
   if (!isDevelopment) return;
   console.log(formatMessage('INFO', message));
 };
 
-// Log canh bao o moi moi truong
+// Log cảnh báo ở mọi môi trường
 const warn = (message: string): void => {
   console.warn(formatMessage('WARN', message));
 };
 
-// Log loi o moi moi truong, kem theo stack neu co
+// Log lỗi ở mọi môi trường, kèm theo stack nếu có
 const error = (message: string, err?: unknown): void => {
   console.error(formatMessage('ERROR', message));
 

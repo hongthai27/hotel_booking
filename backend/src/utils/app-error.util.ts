@@ -1,5 +1,5 @@
-// Loi co kiem soat, chu dong throw tu service layer
-// isOperational = true de phan biet voi loi he thong khong mong doi
+// Lỗi có kiểm soát, chủ động throw từ service layer
+// isOperational = true để phân biệt với lỗi hệ thống không mong đợi
 export class AppError extends Error {
   readonly statusCode: number;
   readonly isOperational: boolean = true;
@@ -9,7 +9,7 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.name = 'AppError';
 
-    // Giu stack trace chinh xac tu noi throw, bo qua constructor nay
+    // Giữ stack trace chính xác từ nơi throw, bỏ qua constructor này
     Error.captureStackTrace(this, this.constructor);
   }
 }

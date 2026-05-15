@@ -18,7 +18,7 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
       socket.join(`role:${role}`);
     });
 
-    // Tham gia room theo bookingId de nhan cap nhat trang thai don cu the
+    // Tham gia room theo bookingId để nhận cập nhật trạng thái đơn cụ thể
     socket.on('join:booking', (bookingId: number) => {
       socket.join(`booking:${bookingId}`);
     });
@@ -33,7 +33,7 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
 
 export const getIO = (): SocketServer => {
   if (!io) {
-    throw new Error('Socket.IO chua duoc khoi tao. Goi initSocket truoc.');
+    throw new Error('Socket.IO chưa được khởi tạo. Gọi initSocket trước.');
   }
   return io;
 };

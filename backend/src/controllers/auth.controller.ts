@@ -58,7 +58,7 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response) => 
   successResponse(
     res,
     null,
-    'Neu email ton tai, chung toi da gui link dat lai mat khau'
+    'Nếu email tồn tại, chúng tôi đã gửi link đặt lại mật khẩu'
   );
 });
 
@@ -67,6 +67,6 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   successResponse(
     res,
     null,
-    'Dat lai mat khau thanh cong. Vui long dang nhap.'
+    'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.'
   );
 });

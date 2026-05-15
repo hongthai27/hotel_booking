@@ -37,7 +37,7 @@ const RoomListPage = () => {
     hasParams ? { checkIn, checkOut, guests } : {}
   );
 
-  // Chua co params — hien thi form tim kiem
+  // Chưa có params — hiển thị form tìm kiếm
   if (!hasParams) {
     return (
       <div className="max-w-4xl mx-auto py-12 flex flex-col items-center gap-6">
@@ -70,7 +70,7 @@ const RoomListPage = () => {
         </p>
       </div>
 
-      {/* ── Search form thu gon ── */}
+      {/* ── Search form thu gọn ── */}
       <SearchForm />
 
       {/* ── Loading skeleton ── */}
