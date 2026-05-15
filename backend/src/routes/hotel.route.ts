@@ -13,10 +13,11 @@ import * as hotelController from '../controllers/hotel.controller';
 
 const router = Router();
 
+// Cấu hình Multer để upload ảnh
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 5 * 1024 * 1024, // 5MB
     files: 10,
   },
   fileFilter: (req: any, file: any, cb: any) => {
@@ -29,6 +30,8 @@ const upload = multer({
   },
 }) as any;
 
+// ── Public Routes ─────────────────────────────────────────────────────────────
+
 router.get(
   '/hotels/available',
   validateQuery(searchAvailableSchema),
@@ -39,18 +42,13 @@ router.get('/hotels/:roomTypeId', hotelController.getRoomTypeById);
 
 router.get('/hotels', hotelController.getAllRoomTypes);
 
+// ── Admin - Room Types ────────────────────────────────────────────────────────
+
 router.get(
   '/admin/room-types',
   authenticateJWT,
-  authorizeRole(['admin']),
+  authorizeRole(['admin', 'receptionist']),
   hotelController.getAllRoomTypes
-);
-
-router.get(
-  '/admin/room-types/:id',
-  authenticateJWT,
-  authorizeRole(['admin']),
-  hotelController.getRoomTypeById
 );
 
 router.post(
@@ -78,11 +76,20 @@ router.delete(
   hotelController.deleteRoomType
 );
 
+// ── Admin - Rooms (QUẢN LÝ PHÒNG) ─────────────────────────────────────────────
+
 router.get(
   '/admin/rooms',
   authenticateJWT,
-  authorizeRole(['admin']),
+  authorizeRole(['admin', 'receptionist']),
   hotelController.getRooms
+);
+ // ROUTE SƠ ĐỒ PHÒNG (DASHBOARD)
+router.get(
+  '/admin/rooms/overview',
+  authenticateJWT,
+  authorizeRole(['admin', 'receptionist']),
+  hotelController.getRoomOverview
 );
 
 router.post(
@@ -104,15 +111,17 @@ router.put(
 router.patch(
   '/admin/rooms/:id/status',
   authenticateJWT,
-  authorizeRole(['admin']),
+  authorizeRole(['admin', 'receptionist']),
   validateBody(updateRoomStatusSchema),
   hotelController.updateRoomStatus
 );
 
+// ── Admin - Amenities (TIỆN ÍCH) ──────────────────────────────────────────────
+
 router.get(
   '/admin/amenities',
   authenticateJWT,
-  authorizeRole(['admin']),
+  authorizeRole(['admin', 'receptionist']),
   hotelController.getAmenities
 );
 

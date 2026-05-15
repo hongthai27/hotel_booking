@@ -430,3 +430,101 @@ export const deleteAmenity = async (id: number, actorId: number) => {
     });
   });
 };
+
+// ── Room Dashboard (Sơ đồ phòng) ─────────────────────────────────────────────
+
+// Danh sách trạng thái booking được coi là đang sử dụng phòng
+const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ['confirmed', 'checked_in'];
+
+export interface RoomGuestOverview {
+  bookingId: number;
+  guestName: string;
+  guestPhone: string;
+  checkInDate: Date;
+  checkOutDate: Date;
+  guestCount: number;
+}
+
+export interface RoomOverview {
+  roomId: number;
+  roomNumber: string;
+  floor: number;
+  status: RoomStatus;
+  currentPrice: number;
+  typeName: string;
+  maxCapacity: number;
+  currentGuest: RoomGuestOverview | null;
+}
+
+/**
+ * Lấy sơ đồ phòng tổng quan bao gồm trạng thái thực tế và thông tin khách hiện tại.
+ * Phục vụ dashboard realtime cho Admin và Lễ tân.
+ */
+export const getRoomOverview = async (): Promise<RoomOverview[]> => {
+  try {
+    // Chốt thời điểm hiện tại để lọc chính xác các booking đang diễn ra
+    const now = new Date();
+
+    const rooms = await prisma.room.findMany({
+      include: {
+        roomType: {
+          select: {
+            typeName: true,
+            maxCapacity: true,
+          },
+        },
+        bookings: {
+          where: {
+            status: { in: ACTIVE_BOOKING_STATUSES },
+            checkInDate: { lte: now },
+            checkOutDate: { gt: now },
+          },
+          select: {
+            id: true,
+            checkInDate: true,
+            checkOutDate: true,
+            guestCount: true,
+            customer: {
+              select: {
+                fullName: true,
+                phoneNumber: true,
+              },
+            },
+          },
+          take: 1, 
+        },
+      },
+      orderBy: [
+        { floor: 'asc' },
+        { roomNumber: 'asc' },
+      ],
+    });
+
+    return rooms.map((room) => {
+      const activeBooking = room.bookings[0];
+
+      return {
+        roomId: room.id,
+        roomNumber: room.roomNumber,
+        floor: room.floor ?? 1,
+        status: room.status,
+        currentPrice: Number(room.currentPrice),
+        typeName: room.roomType.typeName,
+        maxCapacity: room.roomType.maxCapacity,
+
+        currentGuest: activeBooking
+          ? {
+              bookingId: activeBooking.id,
+              guestName: activeBooking.customer.fullName, 
+              guestPhone: activeBooking.customer.phoneNumber, 
+              checkInDate: activeBooking.checkInDate,
+              checkOutDate: activeBooking.checkOutDate,
+              guestCount: activeBooking.guestCount,
+            }
+          : null,
+      };
+    });
+  } catch (error: any) {
+    throw new AppError(500, `Lỗi khi lấy sơ đồ phòng: ${error.message}`);
+  }
+};

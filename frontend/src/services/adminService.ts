@@ -101,4 +101,10 @@ export const adminService = {
     const r = await api.delete(`/admin/room-types/${id}`);
     return r.data;
   },
+
+  // ── Thêm method gọi API Sơ đồ phòng (Dashboard) ──
+  getRoomOverview: async () => {
+    const r = await api.get('/admin/rooms/overview');
+    return r.data.data;
+  },
 };

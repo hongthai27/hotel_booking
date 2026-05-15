@@ -5,6 +5,7 @@ import CustomerLayout from '../layouts/CustomerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 
+// ── Customer Pages ──
 const HomePage = lazy(() => import('../pages/customer/HomePage'));
 const LoginPage = lazy(() => import('../pages/customer/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/customer/RegisterPage'));
@@ -17,6 +18,8 @@ const AboutPage = lazy(() => import('../pages/customer/AboutPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/customer/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/customer/ResetPasswordPage'));
 
+// ── Admin Pages ──
+const DashboardPage = lazy(() => import('../pages/admin/DashboardPage')); // Đã thêm Dashboard
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
 const BookingDetailPage = lazy(() => import('../pages/admin/BookingDetailPage'));
 const RoomTypeListPage = lazy(() => import('../pages/admin/RoomTypeListPage'));
@@ -65,14 +68,8 @@ const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
-      {
-        path: '/forgot-password',
-        element: <ForgotPasswordPage />,
-      },
-      {
-        path: '/reset-password',
-        element:<ResetPasswordPage />,
-      },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
     ],
   },
   {
@@ -92,6 +89,10 @@ const router = createBrowserRouter([
     path: '/admin',
     element: <AdminLayout />,
     children: [
+      // ── Đã thêm route Dashboard làm trang chủ của Admin ──
+      { index: true, element: <DashboardPage /> },
+      { path: 'dashboard', element: <DashboardPage /> },
+      
       { path: 'bookings', element: <BookingListPage /> },
       { path: 'bookings/:id', element: <BookingDetailPage /> },
       { path: 'room-types', element: <RoomTypeListPage /> },

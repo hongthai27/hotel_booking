@@ -114,3 +114,16 @@ export const deleteAmenity = catchAsync(async (req: Request, res: Response) => {
   await hotelService.deleteAmenity(Number(req.params.id), req.user!.userId);
   successResponse(res, null, 'Xóa tiện ích thành công');
 });
+
+// ── Dashboard / Sơ đồ phòng ────────────────────────────────────────────────────
+
+/**
+ * Lấy danh sách sơ đồ phòng tổng quan kèm khách đang lưu trú
+ * Phục vụ cho giao diện Dashboard Realtime của Lễ tân/Admin
+ */
+export const getRoomOverview = catchAsync(async (req: Request, res: Response) => {
+  const rooms = await hotelService.getRoomOverview();
+  
+  // Trả về response chuẩn hóa qua helper successResponse
+  successResponse(res, rooms, 'Lấy sơ đồ phòng tổng quan thành công');
+});
