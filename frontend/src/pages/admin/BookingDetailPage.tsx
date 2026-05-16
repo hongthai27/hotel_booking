@@ -40,6 +40,7 @@ const PAYMENT_MAP: Record<string, string> = {
 const PAYMENT_STATUS_MAP: Record<string, { label: string, color: string }> = {
   pending: { label: 'Chờ thanh toán', color: 'bg-yellow-100 text-yellow-700' },
   completed: { label: 'Đã thanh toán', color: 'bg-green-100 text-green-700' },
+  success: { label: 'Thành công', color: 'bg-green-100 text-green-700' },
   refunded: { label: 'Đã hoàn tiền', color: 'bg-gray-100 text-gray-600' },
   failed: { label: 'Thất bại', color: 'bg-red-100 text-red-700' }
 };

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useSocketAllBookings } from '../../hooks/useSocketBooking';
 import { formatDate } from '../../utils/format';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: 'Chờ thanh toán',
@@ -265,6 +266,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
 };
 
 const BookingListPage = () => {
+  const navigate = useNavigate();
   const { mutate: checkIn, isPending: isCheckingIn } = useCheckIn();
   const { mutate: checkOut, isPending: isCheckingOut } = useCheckOut();
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelAdminBooking();
@@ -436,7 +438,10 @@ const BookingListPage = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <button className="text-primary text-sm font-medium hover:underline">
+                      <button 
+                        onClick={() => navigate(`/admin/bookings/${booking.id}`)} 
+                        className="text-primary text-sm font-medium hover:underline"
+                      >
                         Chi tiết
                       </button>
 

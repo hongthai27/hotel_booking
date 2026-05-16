@@ -3,9 +3,12 @@ import * as bookingService from '../services/booking.service';
 import { successResponse } from '../utils/response.util';
 import { catchAsync } from '../utils/catch-async.util';
 import { BookingStatus, BookingSource } from '@prisma/client';
+import { emitBookingUpdate } from '../utils/socket.util';
 
+// ── Booking ────────────────────────────────────────────────────────────────────
 export const createBooking = catchAsync(async (req: Request, res: Response) => {
   const booking = await bookingService.createBooking(req.body, req.user!.userId);
+  emitBookingUpdate(booking.id, { status: booking.status });
   successResponse(res, booking, 'Đặt phòng thành công', 201);
 });
 
@@ -67,6 +70,8 @@ export const checkIn = catchAsync(async (req: Request, res: Response) => {
     Number(req.params.id),
     req.user!.userId
   );
+  const bookingId = Number(req.params.id);
+  emitBookingUpdate(bookingId, { status: 'checked_in', roomStatus: 'occupied' });
   successResponse(res, result, 'Check-in thành công');
 });
 
@@ -75,6 +80,8 @@ export const checkOut = catchAsync(async (req: Request, res: Response) => {
     Number(req.params.id),
     req.user!.userId
   );
+  const bookingId = Number(req.params.id);
+  emitBookingUpdate(bookingId, { status: 'checked_out', roomStatus: 'cleaning' });
   successResponse(res, result, 'Check-out thành công');
 });
 
@@ -83,6 +90,9 @@ export const createOfflineBooking = catchAsync(async (req: Request, res: Respons
     req.body,
     req.user!.userId
   );
+  if ((result as any).id) {
+    emitBookingUpdate((result as any).id, { status: (result as any).status });
+  }
   successResponse(res, result, 'Tạo đơn tại quầy thành công', 201);
 });
 

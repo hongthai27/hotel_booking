@@ -11,7 +11,9 @@ const MS_PER_DAY = 86400000;
 
 export const createBooking = async (data: CreateBookingDto, userId: number) => {
   const checkInDate = new Date(data.checkInDate);
+  checkInDate.setHours(14, 0, 0, 0);
   const checkOutDate = new Date(data.checkOutDate);
+  checkOutDate.setHours(12, 0, 0, 0);
 
   return prisma.$transaction(async (tx) => {
     const rooms = await tx.room.findMany({
@@ -138,7 +140,11 @@ export const getBookingById = async (
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      room: true,
+      room: {
+        include: {
+          roomType: true
+        }
+      },
       payments: true,
       customer: {
         select: {
@@ -160,7 +166,19 @@ export const getBookingById = async (
     throw new AppError(403, 'Bạn không có quyền xem đơn đặt phòng này');
   }
 
-  return booking;
+const checkIn = new Date(booking.checkInDate);
+const checkOut = new Date(booking.checkOutDate);
+const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+
+const lastPayment = booking.payments[0] || null;
+
+  return {
+    ...booking,
+    totalPrice: Number(booking.totalAmount), 
+    totalNights: nights || 1,                
+    paymentStatus: lastPayment?.status || 'pending', 
+    paymentMethod: lastPayment?.method || 'cash',   
+  };
 };
 
 interface GetAllBookingsFilter {
@@ -374,6 +392,7 @@ export const cancelBooking = async (
 export const checkIn = async (bookingId: number, staffId: number) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
+    include: { room: true }
   });
 
   if (!booking) {
@@ -382,6 +401,26 @@ export const checkIn = async (bookingId: number, staffId: number) => {
 
   if (booking.status !== 'confirmed') {
     throw new AppError(400, `Không thể check-in đơn ở trạng thái ${booking.status}`);
+  }
+
+// ── ĐOẠN KIỂM TRA GIỜ GIẤC VÀ PHÒNG VẬT LÝ ──
+  const now = new Date();
+  const scheduledDate = new Date(booking.checkInDate); // Đã có mốc 14:00 từ DB
+
+  // Kiểm tra xem đã đến 14:00 ngày hẹn chưa
+  if (now < scheduledDate) {
+    throw new AppError(
+      400, 
+      `Chưa đến giờ nhận phòng tiêu chuẩn (Sau 14:00 ngày ${scheduledDate.toLocaleDateString('vi-VN')})`
+    );
+  }
+
+  // Kiểm tra xem phòng vật lý đã được dọn sạch sẽ (available) chưa
+  if (booking.room.status !== 'available') {
+    throw new AppError(
+      400,
+      'Phòng hiện tại chưa sẵn sàng đón khách (Đang có khách khác ở hoặc đang dọn dẹp). Vui lòng đợi phòng sạch mới có thể check-in.'
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -466,7 +505,9 @@ export const createOfflineBooking = async (
   staffId: number
 ) => {
   const checkInDate = new Date(data.checkInDate);
+  checkInDate.setHours(14, 0, 0, 0);
   const checkOutDate = new Date(data.checkOutDate);
+  checkOutDate.setHours(12, 0, 0, 0);
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   return prisma.$transaction(async (tx) => {
@@ -594,7 +635,9 @@ export const updateOfflineBooking = async (
 
   return prisma.$transaction(async (tx) => {
     const checkInDate = data.checkInDate ? new Date(data.checkInDate) : booking.checkInDate;
+    if (data.checkInDate) checkInDate.setHours(14, 0, 0, 0);
     const checkOutDate = data.checkOutDate ? new Date(data.checkOutDate) : booking.checkOutDate;
+    if (data.checkOutDate) checkOutDate.setHours(12, 0, 0, 0);
     const roomId = data.roomId ?? booking.roomId;
 
     const hasDateOrRoomChange = data.roomId || data.checkInDate || data.checkOutDate;

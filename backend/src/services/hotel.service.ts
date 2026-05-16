@@ -179,7 +179,9 @@ export const deleteRoomType = async (id: number, actorId: number) => {
 
 export const searchAvailable = async (data: SearchAvailableDto) => {
   const checkInDate = new Date(data.checkIn);
+  checkInDate.setHours(14, 0, 0, 0);
   const checkOutDate = new Date(data.checkOut);
+  checkOutDate.setHours(12, 0, 0, 0);
 
   const priceFilter = data.minPrice != null || data.maxPrice != null
     ? {
@@ -462,66 +464,88 @@ export interface RoomOverview {
  */
 export const getRoomOverview = async (): Promise<RoomOverview[]> => {
   try {
-    // Chốt thời điểm hiện tại để lọc chính xác các booking đang diễn ra
     const now = new Date();
+    
+    // Tạo mốc thời gian ngày hôm nay để quét các đơn đặt trước
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
 
     const rooms = await prisma.room.findMany({
       include: {
         roomType: {
-          select: {
-            typeName: true,
-            maxCapacity: true,
-          },
+          select: { typeName: true, maxCapacity: true },
         },
         bookings: {
           where: {
             status: { in: ACTIVE_BOOKING_STATUSES },
-            checkInDate: { lte: now },
-            checkOutDate: { gt: now },
+            checkInDate: { lte: todayEnd },
+            checkOutDate: { gt: todayStart },
           },
           select: {
             id: true,
+            status: true,
             checkInDate: true,
             checkOutDate: true,
             guestCount: true,
-            customer: {
-              select: {
-                fullName: true,
-                phoneNumber: true,
-              },
-            },
+            customer: { select: { fullName: true, phoneNumber: true } },
           },
-          take: 1, 
+          orderBy: { checkInDate: 'asc' },
         },
       },
-      orderBy: [
-        { floor: 'asc' },
-        { roomNumber: 'asc' },
-      ],
+      orderBy: [{ floor: 'asc' }, { roomNumber: 'asc' }],
     });
 
     return rooms.map((room) => {
-      const activeBooking = room.bookings[0];
+      // 1. Khách ĐANG Ở thực tế: Bắt buộc trạng thái đơn phải là 'checked_in'
+      const activeBooking = room.bookings.find((b) => b.status === 'checked_in');
+
+      // 2. Khách SẮP ĐẾN hôm nay: Đơn mới ở trạng thái 'confirmed' (chưa check-in)
+      const upcomingBooking = room.bookings.find(
+        (b) => b.status === 'confirmed' && 
+               new Date(b.checkInDate) >= todayStart && 
+               new Date(b.checkInDate) <= todayEnd
+      );
+      let finalStatus = room.status;
+      let guestInfo = null;
+
+      if (activeBooking) {
+        // Nếu có khách đang ở -> Hiện màu Xanh dương
+        finalStatus = 'occupied'; 
+        guestInfo = {
+          bookingId: activeBooking.id,
+          guestName: activeBooking.customer.fullName,
+          guestPhone: activeBooking.customer.phoneNumber,
+          checkInDate: activeBooking.checkInDate,
+          checkOutDate: activeBooking.checkOutDate,
+          guestCount: activeBooking.guestCount,
+          isUpcoming: false,
+        };
+        
+      } else if (upcomingBooking && room.status === 'available') {
+        // Nếu phòng trống SẠCH VÀ có khách sắp đến chiều nay -> Kích hoạt màu Cam tự động!
+        finalStatus = 'reserved' as any;
+        guestInfo = {
+          bookingId: upcomingBooking.id,
+          guestName: upcomingBooking.customer.fullName,
+          guestPhone: upcomingBooking.customer.phoneNumber,
+          checkInDate: upcomingBooking.checkInDate,
+          checkOutDate: upcomingBooking.checkOutDate,
+          guestCount: upcomingBooking.guestCount,
+          isUpcoming: true, // Gắn cờ để Frontend hiển thị nhãn "Khách sắp đến"
+        };
+      }
 
       return {
         roomId: room.id,
         roomNumber: room.roomNumber,
         floor: room.floor ?? 1,
-        status: room.status,
+        status: finalStatus,
         currentPrice: Number(room.currentPrice),
         typeName: room.roomType.typeName,
         maxCapacity: room.roomType.maxCapacity,
-
-        currentGuest: activeBooking
-          ? {
-              bookingId: activeBooking.id,
-              guestName: activeBooking.customer.fullName, 
-              guestPhone: activeBooking.customer.phoneNumber, 
-              checkInDate: activeBooking.checkInDate,
-              checkOutDate: activeBooking.checkOutDate,
-              guestCount: activeBooking.guestCount,
-            }
-          : null,
+        currentGuest: guestInfo,
       };
     });
   } catch (error: any) {

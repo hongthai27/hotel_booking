@@ -88,6 +88,20 @@ router.patch(
   bookingController.checkOut
 );
 
+router.patch(
+  '/admin/bookings/:id/cancel',
+  authenticateJWT,
+  authorizeRole(['admin', 'receptionist']),
+  bookingController.cancelBooking
+);
+
+router.get(
+  '/admin/bookings/:id',
+  authenticateJWT,
+  authorizeRole(['admin', 'receptionist']),
+  bookingController.getBookingById
+);
+
 // ── Admin: Reports ─────────────────────────────────────────────────────────────
 
 router.get(

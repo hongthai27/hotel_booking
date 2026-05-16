@@ -33,8 +33,13 @@ export const useSocketAllBookings = (): void => {
 
   useEffect(() => {
     socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, (_data: BookingUpdatePayload) => {
+      // Cập nhật cho UI của khách
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['rooms'] }); 
+      
+      // Thêm 2 dòng này: Cập nhật NGAY LẬP TỨC cho UI của Lễ tân/Admin
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms', 'overview'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
     });
 
     return () => {
