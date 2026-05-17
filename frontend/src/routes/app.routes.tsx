@@ -5,7 +5,6 @@ import CustomerLayout from '../layouts/CustomerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 
-// ── Customer Pages ──
 const HomePage = lazy(() => import('../pages/customer/HomePage'));
 const LoginPage = lazy(() => import('../pages/customer/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/customer/RegisterPage'));
@@ -17,13 +16,14 @@ const MyBookingsPage = lazy(() => import('../pages/customer/BookingHistoryPage')
 const AboutPage = lazy(() => import('../pages/customer/AboutPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/customer/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/customer/ResetPasswordPage'));
+const CustomerBookingDetailPage = lazy(() => import('../pages/customer/CustomerBookingDetailPage'));
 
-// ── Admin Pages ──
-const DashboardPage = lazy(() => import('../pages/admin/DashboardPage')); // Đã thêm Dashboard
+const DashboardPage = lazy(() => import('../pages/admin/DashboardPage'));
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
 const BookingDetailPage = lazy(() => import('../pages/admin/BookingDetailPage'));
 const RoomTypeListPage = lazy(() => import('../pages/admin/RoomTypeListPage'));
 const ReportPage = lazy(() => import('../pages/admin/ReportPage'));
+const RefundListPage = lazy(() => import('../pages/admin/RefundListPage'));
 const UserListPage = lazy(() => import('../pages/admin/UserListPage'));
 const AmenityListPage = lazy(() => import('../pages/admin/AmenityListPage'));
 
@@ -83,27 +83,34 @@ const router = createBrowserRouter([
       { path: 'booking/:id', element: <BookingPage /> },
       { path: 'payment/:id', element: <PaymentPage /> },
       { path: 'my-bookings', element: <MyBookingsPage /> },
+      {
+        path: 'bookings/:id',
+        element: (
+          <ProtectedRoute roles={['customer']}>
+            <CustomerBookingDetailPage />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   {
     path: '/admin',
     element: <AdminLayout />,
     children: [
-      // ── Đã thêm route Dashboard làm trang chủ của Admin ──
       { index: true, element: <DashboardPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
-      
       { path: 'bookings', element: <BookingListPage /> },
       { path: 'bookings/:id', element: <BookingDetailPage /> },
       { path: 'room-types', element: <RoomTypeListPage /> },
       { path: 'reports', element: <ReportPage /> },
+      { path: 'refunds', element: <RefundListPage /> },
       {
         path: 'users',
         element: (
           <ProtectedRoute roles={['admin']}>
             <UserListPage />
           </ProtectedRoute>
-        )
+        ),
       },
       {
         path: 'amenities',
@@ -111,8 +118,8 @@ const router = createBrowserRouter([
           <ProtectedRoute roles={['admin']}>
             <AmenityListPage />
           </ProtectedRoute>
-        )
-      }
+        ),
+      },
     ],
   },
   { path: '/unauthorized', element: <UnauthorizedPage /> },

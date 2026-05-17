@@ -73,3 +73,15 @@ export interface CreateReviewData {
   rating: number;
   comment?: string;
 }
+
+export interface RefundPreview {
+  bookingId: number;
+  totalAmount: number;
+  isPaid: boolean;
+  refundAmount: number;
+  penaltyAmount: number;
+  refundPolicy: string;
+  daysUntilCheckIn: number;
+  checkInDate: string;
+  checkOutDate: string;
+}

@@ -1,5 +1,5 @@
 import api from './api';
-import type { Booking, BookingStatus, Review } from '../types/booking.types';
+import type { Booking, BookingStatus, Review, RefundPreview } from '../types/booking.types';
 
 interface CreateBookingData {
   roomId: number;
@@ -35,6 +35,11 @@ export const bookingService = {
     return r.data.data;
   },
 
+  getRefundPreview: (id: number): Promise<RefundPreview> =>
+    api
+      .get<{ data: RefundPreview }>(`/bookings/${id}/refund-preview`)
+      .then((r) => r.data.data),
+
   createReview: (
     bookingId: number,
     data: { rating: number; comment?: string }
@@ -47,4 +52,5 @@ export const bookingService = {
     api
       .get<{ data: Review[] }>(`/hotels/${roomTypeId}/reviews`)
       .then((r) => r.data.data),
+      
 };

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMyBookings } from '../../hooks/queries/useBookingsQuery';
-import { useCancelBooking } from '../../hooks/mutations/use-booking.mutation';
 import { useSocketBooking } from '../../hooks/useSocketBooking';
 import type { Booking, BookingStatus } from '../../types/booking.types';
 import { formatVND, formatDate, calcNights } from '../../utils/format';
 import BookingStatusBadge from '../../components/common/BookingStatusBadge';
 import PaymentStatusBadge from '../../components/common/PaymentStatusBadge';
+import CancelBookingModal from '../../components/customer/CancelBookingModal';
 
 const TABS: { label: string; value: BookingStatus | undefined }[] = [
   { label: 'Tất cả', value: undefined },
@@ -20,20 +21,22 @@ const CANCELLABLE: BookingStatus[] = ['pending_payment', 'confirmed'];
 
 const BookingCard = ({
   booking,
-  onCancel,
-  isCancelling,
+  setCancelTarget,
 }: {
   booking: Booking;
-  onCancel: (id: number) => void;
-  isCancelling: boolean;
+  setCancelTarget: (id: number | null) => void;
 }) => {
+  const navigate = useNavigate();
   useSocketBooking(booking.id);
 
   const nights = calcNights(booking.checkInDate, booking.checkOutDate);
   const image = booking.room?.roomType?.images?.[0]?.imageUrl;
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col sm:flex-row">
+    <div 
+      onClick={() => navigate(`/bookings/${booking.id}`)}
+      className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col sm:flex-row cursor-pointer hover:shadow-md transition-shadow"
+    >
       <div className="sm:w-40 h-36 sm:h-auto shrink-0 bg-gradient-to-br from-primary to-primary-dark">
         {image && (
           <img src={image} alt="" className="w-full h-full object-cover" />
@@ -52,11 +55,29 @@ const BookingCard = ({
               </p>
             )}
           </div>
+          
           <div className="flex gap-2 flex-wrap">
             <BookingStatusBadge status={booking.status} />
             <PaymentStatusBadge paidAt={booking.paidAt} />
           </div>
         </div>
+
+        {booking.status === 'cancelled' &&
+          booking.payments?.some((p) => p.status === 'refunded') && (
+            <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 w-fit">
+              <span>↩</span>
+              <span>
+                {(() => {
+                  const refundPayment = booking.payments?.find(
+                    (p) => p.status === 'refunded' && p.feeType === 'refund'
+                  );
+                  return refundPayment
+                    ? `Đã hoàn ${formatVND(Number(refundPayment.amount))}`
+                    : 'Đã hoàn tiền';
+                })()}
+              </span>
+            </div>
+          )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 font-normal">
           <span>{formatDate(booking.checkInDate)} → {formatDate(booking.checkOutDate)}</span>
@@ -70,9 +91,11 @@ const BookingCard = ({
 
           {CANCELLABLE.includes(booking.status) && (
             <button
-              onClick={() => onCancel(booking.id)}
-              disabled={isCancelling}
-              className="text-red-500 text-sm font-medium hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCancelTarget(booking.id);
+              }}
+              className="text-red-500 text-sm font-medium hover:underline"
             >
               Hủy đặt phòng
             </button>
@@ -85,13 +108,14 @@ const BookingCard = ({
 
 const BookingHistoryPage = () => {
   const [activeStatus, setActiveStatus] = useState<BookingStatus | undefined>(undefined);
+  const [cancelTarget, setCancelTarget] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: bookings, isLoading, isError } = useMyBookings(activeStatus);
-  const { mutate: cancel, isPending: isCancelling } = useCancelBooking();
 
-  const handleCancel = (id: number) => {
-    if (!window.confirm('Bạn có chắc muốn hủy đặt phòng này?')) return;
-    cancel({ id });
+  const handleCancelSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    setCancelTarget(null);
   };
 
   return (
@@ -147,11 +171,19 @@ const BookingHistoryPage = () => {
             <BookingCard
               key={booking.id}
               booking={booking}
-              onCancel={handleCancel}
-              isCancelling={isCancelling}
+              setCancelTarget={setCancelTarget}
             />
           ))}
         </div>
+      )}
+
+      {cancelTarget && (
+        <CancelBookingModal
+          bookingId={cancelTarget}
+          isOpen={!!cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onConfirmed={handleCancelSuccess}
+        />
       )}
     </div>
   );

@@ -5,7 +5,6 @@ import { catchAsync } from '../utils/catch-async.util';
 import { BookingStatus, BookingSource } from '@prisma/client';
 import { emitBookingUpdate } from '../utils/socket.util';
 
-// ── Booking ────────────────────────────────────────────────────────────────────
 export const createBooking = catchAsync(async (req: Request, res: Response) => {
   const booking = await bookingService.createBooking(req.body, req.user!.userId);
   emitBookingUpdate(booking.id, { status: booking.status });
@@ -63,6 +62,14 @@ export const cancelBooking = catchAsync(async (req: Request, res: Response) => {
   );
 
   successResponse(res, result, 'Hủy đặt phòng thành công');
+});
+
+export const getRefundPreview = catchAsync(async (req: Request, res: Response) => {
+  const data = await bookingService.getRefundPreview(
+    Number(req.params.id),
+    req.user!.userId
+  );
+  successResponse(res, data, 'Xem trước chính sách hoàn tiền');
 });
 
 export const checkIn = catchAsync(async (req: Request, res: Response) => {

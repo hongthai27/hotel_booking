@@ -847,3 +847,59 @@ export const getReviewsByRoomType = async (
     totalPages: Math.ceil(total / limit),
   };
 };
+
+export const getRefundPreview = async (bookingId: number, userId: number) => {
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, userId },
+    include: {
+      payments: {
+        where: { status: 'success', feeType: 'booking' },
+        take: 1,
+      },
+    },
+  });
+
+  if (!booking) {
+    throw new AppError(404, 'Khong tim thay don dat phong');
+  }
+
+  if (!['confirmed', 'pending_payment'].includes(booking.status)) {
+    throw new AppError(400, 'Don khong the huy');
+  }
+
+  const totalAmount = Number(booking.totalAmount);
+  const isPaid = booking.payments.length > 0;
+  const now = new Date();
+  const daysUntilCheckIn = Math.ceil(
+    (booking.checkInDate.getTime() - now.getTime()) / 86400000
+  );
+
+  let refundAmount = 0;
+  let penaltyAmount = 0;
+  let refundPolicy = '';
+
+  if (!isPaid) {
+    refundPolicy = 'Don chua thanh toan. Huy ngay ma khong mat phi.';
+  } else if (daysUntilCheckIn >= 3) {
+    refundAmount = totalAmount;
+    refundPolicy = 'Huy truoc 3 ngay — hoan 100% tien phong.';
+  } else if (daysUntilCheckIn >= 0) {
+    refundAmount = totalAmount * 0.5;
+    penaltyAmount = totalAmount * 0.5;
+    refundPolicy = `Huy trong vong 3 ngay truoc nhan phong — hoan 50% (${daysUntilCheckIn} ngay con lai).`;
+  } else {
+    throw new AppError(400, 'Khong the huy sau ngay nhan phong');
+  }
+
+  return {
+    bookingId,
+    totalAmount,
+    isPaid,
+    refundAmount,
+    penaltyAmount,
+    refundPolicy,
+    daysUntilCheckIn,
+    checkInDate: booking.checkInDate,
+    checkOutDate: booking.checkOutDate,
+  };
+};

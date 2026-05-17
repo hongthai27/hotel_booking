@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
-  receptionist: 'Lễ tân', // Đã sửa lại lỗi typo "Le tan" thành tiếng Việt có dấu
+  receptionist: 'Lễ tân',
 };
 
 const AdminLayout = () => {
@@ -32,13 +32,16 @@ const AdminLayout = () => {
         </div>
 
         <nav className="flex flex-col gap-1">
-          {/* MENU MỚI THÊM ĐẦU TIÊN: SƠ ĐỒ PHÒNG */}
           <NavLink to="/admin/dashboard" className={navLinkClass}>
             Sơ đồ phòng
           </NavLink>
 
           <NavLink to="/admin/bookings" className={navLinkClass}>
             Quản lý đơn đặt phòng
+          </NavLink>
+
+          <NavLink to="/admin/refunds" className={navLinkClass}>
+            Quản lý hoàn tiền
           </NavLink>
 
           {isAdmin && (

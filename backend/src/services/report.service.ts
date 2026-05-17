@@ -95,3 +95,33 @@ export const getRevenueReport = async (from: string, to: string) => {
     })),
   };
 };
+
+export const getRefundList = async () => {
+  return prisma.payment.findMany({
+    where: {
+      feeType: 'refund',
+      status: 'refunded',
+    },
+    include: {
+      booking: {
+        include: {
+          customer: {
+            select: {
+              fullName: true,
+              email: true,
+              phoneNumber: true,
+            },
+          },
+          room: {
+            include: {
+              roomType: {
+                select: { typeName: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { refundedAt: 'desc' },
+  });
+};

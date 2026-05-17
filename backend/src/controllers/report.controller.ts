@@ -14,3 +14,8 @@ export const getRevenueReport = catchAsync(async (req: Request, res: Response) =
   const data = await reportService.getRevenueReport(from, to);
   successResponse(res, data, 'Lấy báo cáo doanh thu thành công');
 });
+
+export const getRefundList = catchAsync(async (_req: Request, res: Response) => {
+  const data = await reportService.getRefundList();
+  successResponse(res, data, 'Lay danh sach hoan tien thanh cong');
+});

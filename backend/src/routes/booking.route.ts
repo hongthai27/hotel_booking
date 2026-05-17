@@ -32,6 +32,13 @@ router.post(
   bookingController.createBooking
 );
 
+router.get(
+  '/bookings/:id/refund-preview',
+  authenticateJWT,
+  authorizeRole(['customer']),
+  bookingController.getRefundPreview
+);
+
 router.get('/bookings/:id', authenticateJWT, bookingController.getBookingById);
 
 router.patch(
@@ -102,7 +109,14 @@ router.get(
   bookingController.getBookingById
 );
 
-// ── Admin: Reports ─────────────────────────────────────────────────────────────
+// ── Admin: Refunds & Reports ─────────────────────────────────────────────────────
+
+router.get(
+  '/admin/refunds',
+  authenticateJWT,
+  authorizeRole(['admin', 'receptionist']),
+  reportController.getRefundList
+);
 
 router.get(
   '/admin/reports/revenue',
