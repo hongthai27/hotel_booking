@@ -89,7 +89,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
     const expiredAt = new Date(
       booking.createdAt.getTime() + PAYMENT_EXPIRY_MINUTES * 60 * 1000
     );
-
+    emitBookingUpdate(booking.id, { status: booking.status });
     return { ...booking, expiredAt };
   });
 };
@@ -126,6 +126,8 @@ export const getMyBookings = async (
         select: {
           status: true,
           method: true,
+          feeType: true,
+          amount: true,
         },
       },
     },
@@ -259,6 +261,7 @@ export const getAllBookings = async (filter?: any) => {
           select: {
             status: true,
             method: true,
+            feeType: true,
           },
         },
       },
@@ -280,7 +283,6 @@ export const cancelBooking = async (
   actorRole: string,
   reason?: string
 ) => {
-  // Include customer ngay từ đầu, dùng lại ở cuối để gửi email
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -314,17 +316,15 @@ export const cancelBooking = async (
     }
   }
 
-  // Không cho hủy nếu đang ở hoặc đã trả phòng hoặc đã hủy
-if (['checked_in', 'checked_out', 'cancelled'].includes(booking.status)) {
-  throw new AppError(400, `Không thể hủy đơn ở trạng thái ${booking.status}`);
-}
+  if (['checked_in', 'checked_out', 'cancelled'].includes(booking.status)) {
+    throw new AppError(400, `Không thể hủy đơn ở trạng thái ${booking.status}`);
+  }
 
-// Phải là confirmed HOẶC đã thanh toán mới được hủy
-const canCancel = booking.status === 'confirmed' || booking.paidAt !== null;
+  const canCancel = booking.status === 'confirmed' || booking.paidAt !== null;
 
-if (!canCancel) {
-  throw new AppError(400, 'Không thể hủy đơn ở trạng thái này');
-}
+  if (!canCancel) {
+    throw new AppError(400, 'Không thể hủy đơn ở trạng thái này');
+  }
 
   const now = new Date();
   const daysUntilCheckIn = Math.ceil(
@@ -354,31 +354,23 @@ if (!canCancel) {
     if (successPayment) {
       const penaltyAmount = Number(booking.totalAmount) - refundAmount;
 
-      // 1. Chuyển trạng thái giao dịch gốc thành đã hoàn tiền
-      await tx.payment.update({
-        where: { id: successPayment.id },
-        data: {
-          status: 'refunded',
-          refundedAt: now,
-        },
-      });
+      // KHÔNG CẬP NHẬT TRẠNG THÁI GIAO DỊCH GỐC - Giữ nguyên success làm lịch sử dòng tiền
 
-      // 2. Tạo bản ghi cho phần tiền trả lại khách (nếu có)
+      // Tạo bản ghi cho phần tiền trả lại khách (Trạng thái PENDING - Chờ duyệt hoàn tiền)
       if (refundAmount > 0) {
         await tx.payment.create({
           data: {
             bookingId: booking.id,
             amount: refundAmount,
             method: successPayment.method,
-            status: 'refunded',
+            status: 'pending', 
             feeType: 'refund',
-            refundedAt: now,
             transactionRef: `REFUND-${successPayment.transactionRef ?? booking.id}`,
           },
         });
       }
 
-      // 3. Tạo bản ghi cho phần tiền phạt khách sạn thu được (nếu có)
+      // Tạo bản ghi cho phần tiền phạt khách sạn thu được
       if (penaltyAmount > 0) {
         await tx.payment.create({
           data: {
@@ -403,11 +395,12 @@ if (!canCancel) {
       oldValue: oldBooking,
       newValue: updatedBooking,
     });
-      });
-          emitBookingUpdate(bookingId, {
-        status: 'cancelled',
-      });
-  // Dùng lại booking.customer từ query đầu, không cần query thêm
+  });
+  
+  emitBookingUpdate(bookingId, {
+    status: 'cancelled',
+  });
+  
   if (booking.customer) {
     sendCancellationEmail(
       {
@@ -428,6 +421,49 @@ if (!canCancel) {
   return { refundAmount };
 };
 
+// ================= HÀM MỚI CHO ADMIN XÁC NHẬN HOÀN TIỀN =================
+export const confirmRefund = async (bookingId: number, staffId: number) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { payments: true }
+  });
+
+  if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
+
+  // Tìm giao dịch hoàn tiền đang ở trạng thái pending
+  const pendingRefund = booking.payments.find(p => p.feeType === 'refund' && p.status === 'pending');
+  
+  if (!pendingRefund) {
+    throw new AppError(400, 'Không tìm thấy yêu cầu hoàn tiền nào đang chờ xử lý cho đơn này');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Cập nhật trạng thái hoàn tiền thành công
+    await tx.payment.update({
+      where: { id: pendingRefund.id },
+      data: {
+        status: 'refunded',
+        refundedAt: new Date()
+      }
+    });
+
+    await createAuditLog({
+      tx,
+      actorId: staffId,
+      targetTable: 'Payment',
+      targetId: pendingRefund.id,
+      action: 'UPDATE',
+      oldValue: { status: 'pending' },
+      newValue: { status: 'refunded' }
+    });
+  });
+
+  emitBookingUpdate(bookingId, { status: 'cancelled' }); 
+
+  return { message: 'Xác nhận hoàn tiền thành công' };
+};
+// ======================================================================
+
 export const checkIn = async (bookingId: number, staffId: number) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -442,11 +478,9 @@ export const checkIn = async (bookingId: number, staffId: number) => {
     throw new AppError(400, `Không thể check-in đơn ở trạng thái ${booking.status}`);
   }
 
-// ── ĐOẠN KIỂM TRA GIỜ GIẤC VÀ PHÒNG VẬT LÝ ──
   const now = new Date();
-  const scheduledDate = new Date(booking.checkInDate); // Đã có mốc 14:00 từ DB
+  const scheduledDate = new Date(booking.checkInDate); 
 
-  // Kiểm tra xem đã đến 14:00 ngày hẹn chưa
   if (now < scheduledDate) {
     throw new AppError(
       400, 
@@ -454,7 +488,6 @@ export const checkIn = async (bookingId: number, staffId: number) => {
     );
   }
 
-  // Kiểm tra xem phòng vật lý đã được dọn sạch sẽ (available) chưa
   if (booking.room.status !== 'available') {
     throw new AppError(
       400,
@@ -484,7 +517,6 @@ export const checkIn = async (bookingId: number, staffId: number) => {
     });
   });
 
-  // Emit sau khi transaction thành công
   emitBookingUpdate(bookingId, {
     status: 'checked_in',
     roomId: booking.roomId,
@@ -529,7 +561,6 @@ export const checkOut = async (bookingId: number, staffId: number) => {
     });
   });
 
-  // Emit sau khi transaction thành công
   emitBookingUpdate(bookingId, {
     status: 'checked_out',
     roomId: booking.roomId,
@@ -643,7 +674,7 @@ export const createOfflineBooking = async (
       oldValue: null,
       newValue: booking,
     });
-
+    emitBookingUpdate(booking.id, { status: booking.status });
     return booking;
   });
 };
@@ -703,7 +734,6 @@ export const updateOfflineBooking = async (
       }
     }
 
-    // Tính lại tổng tiền nếu có thay đổi phòng hoặc ngày
     let totalAmount = Number(booking.totalAmount);
 
     if (hasDateOrRoomChange) {
@@ -732,12 +762,10 @@ export const updateOfflineBooking = async (
         ...(data.checkInDate && { checkInDate }),
         ...(data.checkOutDate && { checkOutDate }),
         ...(data.guestCount && { guestCount: data.guestCount }),
-        // Cập nhật lại tổng tiền nếu có thay đổi
         ...(hasDateOrRoomChange && { totalAmount }),
       },
     });
 
-    // Xử lý chênh lệch tiền nếu tổng tiền thay đổi
     const priceDiff = totalAmount - Number(booking.totalAmount);
 
     if (hasDateOrRoomChange && priceDiff !== 0) {
@@ -746,8 +774,8 @@ export const updateOfflineBooking = async (
           bookingId,
           amount: Math.abs(priceDiff),
           method: 'cash',
-          status: 'success', // Đổi status thành success
-          feeType: priceDiff > 0 ? 'booking' : 'refund', // Thêm dòng feeType
+          status: 'success', 
+          feeType: priceDiff > 0 ? 'booking' : 'refund', 
           paidAt: new Date(),
           ...(priceDiff < 0 && { refundedAt: new Date() }),
           transactionRef: `OFFLINE-ADJ-${bookingId}-${Date.now()}`,
@@ -860,11 +888,11 @@ export const getRefundPreview = async (bookingId: number, userId: number) => {
   });
 
   if (!booking) {
-    throw new AppError(404, 'Khong tim thay don dat phong');
+    throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
   }
 
   if (!['confirmed', 'pending_payment'].includes(booking.status)) {
-    throw new AppError(400, 'Don khong the huy');
+    throw new AppError(400, 'Đơn không thể hủy');
   }
 
   const totalAmount = Number(booking.totalAmount);
@@ -879,16 +907,16 @@ export const getRefundPreview = async (bookingId: number, userId: number) => {
   let refundPolicy = '';
 
   if (!isPaid) {
-    refundPolicy = 'Don chua thanh toan. Huy ngay ma khong mat phi.';
+    refundPolicy = 'Đơn chưa thanh toán. Hủy ngay mà không mất phí.';
   } else if (daysUntilCheckIn >= 3) {
     refundAmount = totalAmount;
-    refundPolicy = 'Huy truoc 3 ngay — hoan 100% tien phong.';
+    refundPolicy = 'Hủy trước 3 ngày — hoàn 100% tiền phòng.';
   } else if (daysUntilCheckIn >= 0) {
     refundAmount = totalAmount * 0.5;
     penaltyAmount = totalAmount * 0.5;
-    refundPolicy = `Huy trong vong 3 ngay truoc nhan phong — hoan 50% (${daysUntilCheckIn} ngay con lai).`;
+    refundPolicy = `Hủy trong vòng 3 ngày trước nhận phòng — hoàn 50% (${daysUntilCheckIn} ngày còn lại).`;
   } else {
-    throw new AppError(400, 'Khong the huy sau ngay nhan phong');
+    throw new AppError(400, 'Không thể hủy sau ngày nhận phòng');
   }
 
   return {

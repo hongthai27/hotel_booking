@@ -5,6 +5,7 @@ export const useAdminBookings = (filters?: Record<string, unknown>) => {
   return useQuery({
     queryKey: ['admin', 'bookings', filters],
     queryFn: () => adminService.getBookings(filters),
+    refetchInterval: 10000,
   });
 };
 

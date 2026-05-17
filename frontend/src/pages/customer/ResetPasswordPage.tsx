@@ -33,7 +33,7 @@ const ResetPasswordPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Neu khong co token -> redirect ngay
+  // Nếu không có token -> redirect ngay
   useEffect(() => {
     if (!token) {
       toast.error('Link không hợp lệ');
@@ -83,7 +83,7 @@ const ResetPasswordPage = () => {
         <p className="text-sm text-gray-500 mt-2">Nhập mật khẩu mới cho tài khoản của bạn</p>
       </div>
 
-      {/* Token het han */}
+      {/* Token hết hạn */}
       {errors.root && (
         <div className="space-y-6">
           <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">

@@ -26,11 +26,10 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
       { id: bookingId },
       {
         onSuccess: () => {
-          toast.success('Huy dat phong thanh cong');
-          onConfirmed();
+        onConfirmed();
         },
         onError: (err: any) => {
-          const message = err?.response?.data?.message ?? 'Co loi xay ra';
+          const message = err?.response?.data?.message ?? 'Có lỗi xảy ra';
           toast.error(message);
         },
       }
@@ -46,7 +45,7 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <h3 className="text-base font-medium text-gray-800">
-            Xac nhan huy dat phong
+            Xác nhận hủy đặt phòng
           </h3>
           <button
             onClick={onClose}
@@ -59,22 +58,19 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
 
         {/* Body */}
         <div className="px-6 py-4 flex flex-col gap-4">
-          {/* Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-8 gap-2">
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-gray-400">Dang tai thong tin hoan tien...</span>
+              <span className="text-sm text-gray-400">Đang tải thông tin hoàn tiền...</span>
             </div>
           )}
 
-          {/* Error */}
           {isError && (
             <p className="text-sm text-red-500 text-center py-4">
-              Khong the tai thong tin hoan tien. Vui long thu lai.
+              Không thể tải thông tin hoàn tiền. Vui lòng thử lại.
             </p>
           )}
 
-          {/* Data */}
           {data && (
             <>
               {/* Policy */}
@@ -84,18 +80,18 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
                 </p>
               </div>
 
-              {/* Chi tiet tai chinh */}
+              {/* Chi tiết tài chính */}
               {data.isPaid && (
                 <div className="flex flex-col gap-2 text-sm border border-gray-100 rounded-xl p-4">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Tong tien dat phong</span>
+                    <span className="text-gray-500">Tổng tiền đặt phòng</span>
                     <span className="text-gray-800 font-medium">
                       {formatVND(data.totalAmount)}
                     </span>
                   </div>
                   {data.penaltyAmount > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Phi huy phong</span>
+                      <span className="text-gray-500">Phí hủy phòng</span>
                       <span className="text-red-500 font-medium">
                         - {formatVND(data.penaltyAmount)}
                       </span>
@@ -103,7 +99,7 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
                   )}
                   <hr className="border-gray-100" />
                   <div className="flex justify-between font-medium">
-                    <span className="text-gray-800">Tien hoan lai</span>
+                    <span className="text-gray-800">Tiền hoàn lại</span>
                     <span className={data.refundAmount > 0 ? 'text-green-600' : 'text-gray-500'}>
                       {formatVND(data.refundAmount)}
                     </span>
@@ -114,7 +110,7 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
               {!data.isPaid && (
                 <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                   <p className="text-sm text-green-700 font-normal">
-                    Don chua thanh toan, khong co phi huy.
+                    Đơn chưa thanh toán, không có phí hủy.
                   </p>
                 </div>
               )}
@@ -129,14 +125,14 @@ const CancelBookingModal = ({ bookingId, isOpen, onClose, onConfirmed }: Props) 
             disabled={isPending}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
           >
-            Giu nguyen
+            Giữ nguyên
           </button>
           <button
             onClick={handleConfirm}
             disabled={isPending || isLoading || isError || !data}
             className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
           >
-            {isPending ? 'Dang huy...' : 'Xac nhan huy'}
+            {isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
           </button>
         </div>
       </div>

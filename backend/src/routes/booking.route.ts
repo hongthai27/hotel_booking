@@ -125,4 +125,11 @@ router.get(
   reportController.getRevenueReport
 );
 
+router.patch(
+  '/admin/bookings/:id/confirm-refund',
+  authenticateJWT,
+  authorizeRole(['admin', 'receptionist']),
+  bookingController.confirmRefund
+);
+
 export default router;

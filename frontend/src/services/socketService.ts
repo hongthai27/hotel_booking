@@ -11,53 +11,62 @@ type SocketEvent = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];
 const SERVER_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000';
 
 class SocketService {
-  private socket: Socket | null = null;
+  public socket: Socket;
+  private currentRole: string | null = null;
 
-  connect(role: string): void {
-    if (this.socket?.connected) return;
-
+  constructor() {
     this.socket = io(SERVER_URL, {
-     
-      autoConnect: true,
+      transports: ['websocket'],
+      autoConnect: false,
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected:', this.socket?.id);
-      this.socket?.emit('join:role', role);
+      console.log('Socket connected:', this.socket.id);
+      if (this.currentRole) {
+        this.socket.emit('join:role', this.currentRole);
+      }
     });
 
     this.socket.on('disconnect', () => {
       console.log('Socket disconnected');
     });
+  }
 
-    this.socket.on('connect_error', (error: Error) => {
-      console.error('Socket connection error:', error.message);
-    });
+  connect(role: string): void {
+    this.currentRole = role;
+    if (!this.socket.connected) {
+      this.socket.connect();
+    } else {
+      this.socket.emit('join:role', role);
+    }
   }
 
   joinBooking(bookingId: number): void {
-    if (!this.socket) return;
-    this.socket.emit('join:booking', bookingId);
+    if (this.socket.connected) {
+      this.socket.emit('join:booking', bookingId);
+    } else {
+            this.socket.once('connect', () => {
+        this.socket.emit('join:booking', bookingId);
+      });
+    }
   }
 
   on(event: SocketEvent, callback: (data: unknown) => void): void {
-    if (!this.socket) return;
+ 
     this.socket.on(event, callback);
   }
 
-  off(event: SocketEvent): void {
-    if (!this.socket) return;
-    this.socket.off(event);
+  off(event: SocketEvent, callback?: (data: unknown) => void): void {
+    if (callback) {
+      this.socket.off(event, callback);
+    } else {
+      this.socket.off(event);
+    }
   }
 
   disconnect(): void {
-    if (!this.socket) return;
+    this.currentRole = null;
     this.socket.disconnect();
-    this.socket = null;
-  }
-
-  get isConnected(): boolean {
-    return this.socket?.connected ?? false;
   }
 }
 

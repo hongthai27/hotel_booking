@@ -54,12 +54,16 @@ export const getAllBookings = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const cancelBooking = catchAsync(async (req: Request, res: Response) => {
+  const bookingId = Number(req.params.id);
+  
   const result = await bookingService.cancelBooking(
-    Number(req.params.id),
+    bookingId,
     req.user!.userId,
     req.user!.role,
     req.body.reason
   );
+
+  emitBookingUpdate(bookingId, { status: 'cancelled' });
 
   successResponse(res, result, 'Hủy đặt phòng thành công');
 });
@@ -130,4 +134,9 @@ export const getReviewsByRoomType = catchAsync(async (req: Request, res: Respons
   );
 
   successResponse(res, reviews, 'Lấy danh sách đánh giá thành công');
+});
+
+export const confirmRefund = catchAsync(async (req: Request, res: Response) => {
+  const result = await bookingService.confirmRefund(Number(req.params.id), req.user!.userId);
+  successResponse(res, result, 'Xác nhận hoàn tiền thành công');
 });

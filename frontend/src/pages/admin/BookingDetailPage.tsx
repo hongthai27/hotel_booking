@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingService } from '../../services/booking.service';
+import api from '../../services/api';
+import { toast } from 'sonner';
 import { 
   useCheckIn, 
   useCheckOut, 
@@ -34,15 +36,8 @@ const SOURCE_MAP: Record<string, { label: string, color: string }> = {
 const PAYMENT_MAP: Record<string, string> = {
   cash: 'Tiền mặt',
   card: 'Thẻ ngân hàng',
+  qr_code: 'Chuyển khoản QR',
   transfer: 'Chuyển khoản',
-};
-
-const PAYMENT_STATUS_MAP: Record<string, { label: string, color: string }> = {
-  pending: { label: 'Chờ thanh toán', color: 'bg-yellow-100 text-yellow-700' },
-  completed: { label: 'Đã thanh toán', color: 'bg-green-100 text-green-700' },
-  success: { label: 'Thành công', color: 'bg-green-100 text-green-700' },
-  refunded: { label: 'Đã hoàn tiền', color: 'bg-gray-100 text-gray-600' },
-  failed: { label: 'Thất bại', color: 'bg-red-100 text-red-700' }
 };
 
 // ── COMPONENTS ──
@@ -58,6 +53,7 @@ const DetailRow = ({ label, value, isBold = false }: { label: string; value: Rea
 const BookingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Hooks gọi API
   const { data, isLoading, isError } = useQuery({
@@ -66,10 +62,56 @@ const BookingDetailPage = () => {
     enabled: !!id,
   });
   const booking = data as any;
+  
   // Hooks thao tác (Mutations)
   const { mutate: checkIn, isPending: isCheckingIn } = useCheckIn();
   const { mutate: checkOut, isPending: isCheckingOut } = useCheckOut();
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelAdminBooking();
+
+  // Mutation xác nhận hoàn tiền
+  const { mutate: confirmRefund, isPending: isConfirmingRefund } = useMutation({
+    mutationFn: (bookingId: number) => api.patch(`/admin/bookings/${bookingId}/confirm-refund`),
+    onSuccess: () => {
+      toast.success('Xác nhận hoàn tiền thành công');
+      queryClient.invalidateQueries({ queryKey: ['admin-booking-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi xác nhận hoàn tiền');
+    }
+  });
+
+  // Tìm lệnh hoàn tiền đang bị chờ (pending refund)
+  const pendingRefund = booking?.payments?.find(
+    (p: any) => p.feeType === 'refund' && p.status === 'pending'
+  );
+
+  // LOGIC MỚI: Lấy đúng giao dịch thanh toán gốc
+  const bookingPayment = booking?.payments?.find((p: any) => p.feeType === 'booking') || booking?.payments?.[0];
+  const PAY_METHOD = PAYMENT_MAP[bookingPayment?.method ?? booking?.paymentMethod] ?? bookingPayment?.method ?? booking?.paymentMethod ?? '—';
+
+  // HÀM MỚI: Xử lý trạng thái thanh toán thông minh
+  const getPaymentStatus = () => {
+    if (!booking) return { label: '—', color: 'bg-gray-100 text-gray-500' };
+
+    if (booking.status === 'cancelled') {
+      const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
+      if (isRefunded) return { label: 'Đã hoàn tiền', color: 'bg-gray-100 text-gray-600' };
+      
+      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending');
+      if (isPendingRefund) return { label: 'Chờ hoàn tiền', color: 'bg-orange-100 text-orange-700' };
+      
+      return { label: 'Đã hủy', color: 'bg-gray-100 text-gray-500' };
+    }
+    
+    if (booking.paidAt || booking.payments?.some((p: any) => p.feeType === 'booking' && p.status === 'success')) {
+      return { label: 'Đã thanh toán', color: 'bg-green-100 text-green-700' };
+    }
+    
+    return { label: 'Chờ thanh toán', color: 'bg-yellow-100 text-yellow-700' };
+  };
+
+  const PAY_STATUS = getPaymentStatus();
 
   return (
     <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
@@ -168,6 +210,21 @@ const BookingDetailPage = () => {
                     {isCheckingOut ? 'Đang xử lý...' : 'Check-out'}
                   </button>
                 )}
+
+                {/* Xác nhận hoàn tiền */}
+                {pendingRefund && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Bạn xác nhận đã hoàn tiền cho khách hàng này?')) {
+                        confirmRefund(booking.id);
+                      }
+                    }}
+                    disabled={isConfirmingRefund}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shadow-sm shadow-blue-600/20"
+                  >
+                    {isConfirmingRefund ? 'Đang xử lý...' : 'Xác nhận hoàn tiền'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -234,21 +291,47 @@ const BookingDetailPage = () => {
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 flex flex-col gap-2">
                 <DetailRow 
                   label="Phương thức" 
-                  value={PAYMENT_MAP[booking.paymentMethod] ?? booking.paymentMethod ?? '—'} 
+                  value={PAY_METHOD} 
                 />
                 <DetailRow 
                   label="Trạng thái" 
                   value={
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${PAYMENT_STATUS_MAP[booking.paymentStatus]?.color ?? 'bg-gray-200 text-gray-600'}`}>
-                      {PAYMENT_STATUS_MAP[booking.paymentStatus]?.label ?? booking.paymentStatus ?? '—'}
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${PAY_STATUS.color}`}>
+                      {PAY_STATUS.label}
                     </span>
                   } 
                 />
+                
+                {/* HIỂN THỊ THÊM THỜI GIAN / MÃ GIAO DỊCH GỐC (NẾU CÓ) */}
+                {bookingPayment?.paidAt && (
+                  <DetailRow 
+                    label="Thời gian thanh toán" 
+                    value={formatDate(bookingPayment.paidAt)} 
+                  />
+                )}
+                {bookingPayment?.transactionRef && (
+                  <DetailRow 
+                    label="Mã giao dịch" 
+                    value={<span className="font-mono text-xs text-gray-600">{bookingPayment.transactionRef.slice(0, 20)}...</span>} 
+                  />
+                )}
+
                 <div className="h-px bg-gray-200 w-full my-2"></div>
                 <div className="flex justify-between items-center">
                   <span className="text-base font-bold text-gray-800">Tổng cộng</span>
                   <span className="text-xl font-bold text-primary">{formatVND(booking.totalPrice)}</span>
                 </div>
+                
+                {/* HIỂN THỊ TIỀN CHỜ HOÀN NẾU CÓ */}
+                {pendingRefund && (
+                  <>
+                    <div className="h-px bg-gray-200 w-full my-2"></div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-orange-600">Cần hoàn tiền (Chờ duyệt)</span>
+                      <span className="text-lg font-bold text-orange-600">{formatVND(Number(pendingRefund.amount))}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

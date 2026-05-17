@@ -14,8 +14,7 @@ import { formatDate } from '../../utils/format';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import BookingStatusBadge from '../../components/common/BookingStatusBadge';
-import PaymentStatusBadge from '../../components/common/PaymentStatusBadge';
-
+// Đã xóa import PaymentStatusBadge thừa ở đây
 
 const SOURCE_LABEL: Record<string, string> = {
   online: 'Trực tuyến',
@@ -265,8 +264,6 @@ const BookingListPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
 
-  useSocketAllBookings();
-
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, status, source]);
@@ -305,6 +302,43 @@ const BookingListPage = () => {
     page: payload.page || 1,
     totalPages: payload.totalPages || 1,
     total: payload.total || 0
+  };
+
+  const bookingIds = bookings.map((b: any) => b.id);
+  useSocketAllBookings(bookingIds);
+
+  const renderBadges = (booking: any) => {
+    // 1. Nếu đơn bị hủy: Ưu tiên hiển thị trạng thái hoàn tiền (Chờ hoàn / Đã hoàn / Đã hủy)
+    if (booking.status === 'cancelled') {
+      const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
+      if (isRefunded) {
+        return (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+            Đã hoàn tiền
+          </span>
+        );
+      }
+
+      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending');
+      if (isPendingRefund) {
+        return (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
+            Chờ hoàn tiền
+          </span>
+        );
+      }
+      
+      return (
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+          Đã hủy
+        </span>
+      );
+    }
+
+    // 2. Nếu đơn bình thường: CHỈ CẦN 1 THẺ BookingStatusBadge 
+    return (
+      <BookingStatusBadge status={booking.status} />
+    );
   };
 
   return (
@@ -419,9 +453,9 @@ const BookingListPage = () => {
                     </span>
                   </td>
                   <td className="px-4 py-3">
+                    {/* GỌI HÀM RENDER BADGE THÔNG MINH Ở ĐÂY */}
                     <div className="flex gap-2 flex-wrap">
-                      <BookingStatusBadge status={booking.status} />
-                      <PaymentStatusBadge paidAt={booking.paidAt} />
+                      {renderBadges(booking)}
                     </div>
                   </td>
                   <td className="px-4 py-3">

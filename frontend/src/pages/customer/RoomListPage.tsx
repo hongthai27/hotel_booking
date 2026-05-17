@@ -37,7 +37,6 @@ const RoomListPage = () => {
     hasParams ? { checkIn, checkOut, guests } : {}
   );
 
-  // Chưa có params — hiển thị form tìm kiếm
   if (!hasParams) {
     return (
       <div className="max-w-4xl mx-auto py-12 flex flex-col items-center gap-6">
@@ -58,7 +57,6 @@ const RoomListPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ── Header ── */}
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-medium text-gray-800">
           {isLoading
@@ -70,10 +68,8 @@ const RoomListPage = () => {
         </p>
       </div>
 
-      {/* ── Search form thu gọn ── */}
       <SearchForm />
 
-      {/* ── Loading skeleton ── */}
       {isLoading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SkeletonCard />
@@ -82,7 +78,6 @@ const RoomListPage = () => {
         </div>
       )}
 
-      {/* ── Error ── */}
       {isError && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <p className="text-gray-800 font-medium text-sm">
@@ -94,7 +89,6 @@ const RoomListPage = () => {
         </div>
       )}
 
-      {/* ── Empty ── */}
       {!isLoading && !isError && rooms?.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <p className="text-gray-800 font-medium text-sm">
@@ -106,12 +100,11 @@ const RoomListPage = () => {
         </div>
       )}
 
-      {/* ── Results ── */}
       {!isLoading && !isError && rooms && rooms.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rooms.map((roomType) => (
+          {rooms.map((roomType, index) => (
             <HotelCard
-              key={roomType.id}
+              key={`${roomType.id ?? 'hotel'}-${index}`}
               roomType={roomType}
               checkIn={checkIn}
               checkOut={checkOut}

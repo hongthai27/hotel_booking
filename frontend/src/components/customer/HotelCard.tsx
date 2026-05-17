@@ -48,7 +48,7 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
 
       {/* Content */}
       <div className="p-5 flex flex-col gap-3">
-        {/* Ten + suc chua */}
+        {/* Tên + sức chứa */}
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-gray-800 font-medium text-base leading-snug">
             {roomType.typeName}
@@ -73,9 +73,9 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
         {/* Amenities */}
         {visibleAmenities.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {visibleAmenities.map((amenity) => (
+            {visibleAmenities.map((amenity, index) => (
               <span
-                key={amenity.id}
+                key={`${amenity.id ?? 'amenity'}-${index}`}
                 className="text-xs font-normal px-2.5 py-1 rounded-full bg-primary/5 text-primary"
               >
                 {amenity.amenityName}
@@ -89,7 +89,7 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
           </div>
         )}
 
-        {/* Gia + CTA */}
+        {/* Giá + CTA */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div>
             <span className="text-xs text-gray-400 font-normal">Từ</span>

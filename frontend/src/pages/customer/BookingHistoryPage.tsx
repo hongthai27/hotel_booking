@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMyBookings } from '../../hooks/queries/useBookingsQuery';
-import { useSocketBooking } from '../../hooks/useSocketBooking';
+import { useSocketAllBookings } from '../../hooks/useSocketBooking';
 import type { Booking, BookingStatus } from '../../types/booking.types';
 import { formatVND, formatDate, calcNights } from '../../utils/format';
 import BookingStatusBadge from '../../components/common/BookingStatusBadge';
-import PaymentStatusBadge from '../../components/common/PaymentStatusBadge';
 import CancelBookingModal from '../../components/customer/CancelBookingModal';
 
 const TABS: { label: string; value: BookingStatus | undefined }[] = [
@@ -27,10 +26,52 @@ const BookingCard = ({
   setCancelTarget: (id: number | null) => void;
 }) => {
   const navigate = useNavigate();
-  useSocketBooking(booking.id);
-
+  
   const nights = calcNights(booking.checkInDate, booking.checkOutDate);
   const image = booking.room?.roomType?.images?.[0]?.imageUrl;
+
+  const renderBadges = () => {
+    if (booking.status === 'cancelled') {
+      const isRefunded = booking.payments?.some((p) => p.feeType === 'refund' && p.status === 'refunded');
+      if (isRefunded) {
+        return (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+            Đã hoàn tiền
+          </span>
+        );
+      }
+
+      const isPendingRefund = booking.payments?.some((p) => p.feeType === 'refund' && p.status === 'pending');
+      if (isPendingRefund) {
+        return (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
+            Chờ hoàn tiền
+          </span>
+        );
+      }
+      
+      return (
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+          Đã hủy
+        </span>
+      );
+    }
+
+    return (
+      <>
+        <BookingStatusBadge status={booking.status} />
+        {booking.paidAt ? (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+            Đã thanh toán
+          </span>
+        ) : (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200">
+            Chờ thanh toán
+          </span>
+        )}
+      </>
+    );
+  };
 
   return (
     <div 
@@ -57,27 +98,9 @@ const BookingCard = ({
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            <BookingStatusBadge status={booking.status} />
-            <PaymentStatusBadge paidAt={booking.paidAt} />
+            {renderBadges()}
           </div>
         </div>
-
-        {booking.status === 'cancelled' &&
-          booking.payments?.some((p) => p.status === 'refunded') && (
-            <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 w-fit">
-              <span>↩</span>
-              <span>
-                {(() => {
-                  const refundPayment = booking.payments?.find(
-                    (p) => p.status === 'refunded' && p.feeType === 'refund'
-                  );
-                  return refundPayment
-                    ? `Đã hoàn ${formatVND(Number(refundPayment.amount))}`
-                    : 'Đã hoàn tiền';
-                })()}
-              </span>
-            </div>
-          )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 font-normal">
           <span>{formatDate(booking.checkInDate)} → {formatDate(booking.checkOutDate)}</span>
@@ -112,6 +135,9 @@ const BookingHistoryPage = () => {
   const queryClient = useQueryClient();
 
   const { data: bookings, isLoading, isError } = useMyBookings(activeStatus);
+
+  const bookingIds = bookings?.map((b: any) => b.id) || [];
+  useSocketAllBookings(bookingIds);
 
   const handleCancelSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });

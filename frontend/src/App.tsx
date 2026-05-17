@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppRouter } from './routes/app.routes';
 import { useAuthStore } from './stores/authStore';
+import { socketService } from './services/socketService'; // <--- Thêm import này
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,10 +16,20 @@ const queryClient = new QueryClient({
 
 const App = () => {
   const initAuth = useAuthStore((s) => s.initAuth);
+  const user = useAuthStore((s) => s.user); // <--- Lấy user hiện tại
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  // BÍ QUYẾT 1: Báo cho Backend biết "Tôi là Admin" để vào đúng room
+  useEffect(() => {
+    if (user) {
+      socketService.connect(user.role);
+    } else {
+      socketService.disconnect();
+    }
+  }, [user]);
 
   return (
     <QueryClientProvider client={queryClient}>

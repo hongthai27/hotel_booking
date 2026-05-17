@@ -9,41 +9,52 @@ interface BookingUpdatePayload {
   roomStatus?: string;
 }
 
+// 1. Hook dùng cho danh sách (Admin & Lịch sử khách)
+export const useSocketAllBookings = (bookingIds: number[] = []): void => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Join vào tất cả các room đang hiện trên màn hình
+    bookingIds.forEach(id => {
+      if (id) socketService.joinBooking(id);
+    });
+
+    const handleUpdate = (_data: BookingUpdatePayload) => {
+      // Khi có update, quét sạch mọi cache liên quan
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: ['rooms'] }); 
+    };
+
+    socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
+
+    return () => {
+
+      socketService.off(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
+    };
+  }, [queryClient, JSON.stringify(bookingIds)]);
+};
+
+// 2. Hook dùng cho trang Chi tiết
 export const useSocketBooking = (bookingId: number): void => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!bookingId) return;
-
+    
     socketService.joinBooking(bookingId);
 
-    socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, (_data: BookingUpdatePayload) => {
-      queryClient.invalidateQueries({ queryKey: ['bookings', 'my'] });
-      queryClient.invalidateQueries({ queryKey: ['bookings', bookingId] });
-    });
+    const handleUpdate = (_data: BookingUpdatePayload) => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      // Cập nhật riêng luôn cho trang Chi tiết Admin
+      queryClient.invalidateQueries({ queryKey: ['admin-booking-detail', String(bookingId)] });
+    };
+
+    socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
 
     return () => {
-      socketService.off(SOCKET_EVENTS.BOOKING_UPDATED);
+      socketService.off(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
     };
   }, [bookingId, queryClient]);
-};
-
-export const useSocketAllBookings = (): void => {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, (_data: BookingUpdatePayload) => {
-      // Cập nhật cho UI của khách
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['rooms'] }); 
-      
-      // Thêm 2 dòng này: Cập nhật NGAY LẬP TỨC cho UI của Lễ tân/Admin
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms', 'overview'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
-    });
-
-    return () => {
-      socketService.off(SOCKET_EVENTS.BOOKING_UPDATED);
-    };
-  }, [queryClient]);
 };
