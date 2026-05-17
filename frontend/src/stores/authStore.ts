@@ -22,26 +22,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
 
   login: async (identifier: string, password: string) => {
-    set({ isLoading: true });
-    try {
-      const data = await authService.login({ identifier, password });
-      localStorage.setItem(TOKEN_KEY, data.token);
-      set({ user: data.user, token: data.token });
 
-      // Kết nối socket sau khi login thành công
-      socketService.connect(data.user.role);
-    } finally {
-      set({ isLoading: false });
-    }
+    const data = await authService.login({ identifier, password });
+    localStorage.setItem(TOKEN_KEY, data.token);
+    set({ user: data.user, token: data.token });
+
+    // Kết nối socket sau khi login thành công
+    socketService.connect(data.user.role);
   },
 
   register: async (data: RegisterDTO) => {
-    set({ isLoading: true });
-    try {
-      await authService.register(data);
-    } finally {
-      set({ isLoading: false });
-    }
+   
+    await authService.register(data);
   },
 
   logout: () => {
@@ -61,18 +53,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
 
+    // isLoading chỉ nên được dùng khi load lại toàn bộ trang web (init)
     set({ token, isLoading: true });
     try {
       await get().getMe();
-
-      // Kết nối socket sau khi xác thực thành công
-      const user = get().user;
-      if (user) {
-        socketService.connect(user.role);
-      }
-    } catch {
-      // get().logout() đã bao gồm cả việc clear localStorage và ngắt socket
-      get().logout();
+    } catch (error) {
+      localStorage.removeItem(TOKEN_KEY);
+      set({ token: null, user: null });
     } finally {
       set({ isLoading: false });
     }

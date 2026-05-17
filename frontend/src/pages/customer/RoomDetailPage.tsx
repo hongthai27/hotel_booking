@@ -59,7 +59,8 @@ const RoomDetailPage = () => {
     }
 
     if (!user) {
-      navigate(`/login?redirect=/booking/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`);
+      const returnUrl = encodeURIComponent(`/booking/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`);
+      navigate(`/login?redirect=${returnUrl}`);
       return;
     }
     navigate(`/booking/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`);

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../stores/authStore';
@@ -14,26 +15,38 @@ const MOCK_ROOMS: Record<number, any> = {
 };
 
 const BookingPage = () => {
-
   useSocketAllBookings();
 
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, getMe } = useAuthStore();
 
   const checkIn = searchParams.get('checkIn') ?? '';
   const checkOut = searchParams.get('checkOut') ?? '';
   const guests = Number(searchParams.get('guests')) || 1;
 
-  // Lấy dữ liệu API hoặc dùng dữ liệu giả nếu API không có
+  useEffect(() => {
+    const token = localStorage.getItem('hotel_token');
+    if (token && !user?.phoneNumber) {
+      getMe().catch(() => {});
+    }
+  }, [user, getMe]);
+
+  const isValidDate = (dateString: string) => {
+    if (!dateString) return false;
+    const d = new Date(dateString);
+    return !isNaN(d.getTime());
+  };
+
+  const isDatesValid = isValidDate(checkIn) && isValidDate(checkOut);
+
   const { data: apiData, isLoading: isLoadingRoom } = useRoomTypeDetail(Number(id));
   const roomType = apiData || MOCK_ROOMS[Number(id)];
   
-  // Khai báo lại hàm tạo đơn đặt phòng bị thiếu
   const { mutate: createBooking, isPending } = useCreateBooking();
 
-  const nights = calcNights(checkIn, checkOut);
+  const nights = isDatesValid ? calcNights(checkIn, checkOut) : 0;
   const basePrice = roomType?.basePrice ?? 0;
   const total = nights * basePrice;
 
@@ -89,6 +102,22 @@ const BookingPage = () => {
           className="text-primary text-sm font-medium hover:underline"
         >
           Quay lại
+        </button>
+      </div>
+    );
+  }
+
+  if (!isDatesValid) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <p className="text-gray-800 font-medium text-sm">
+          Thông tin ngày nhận hoặc trả phòng bị thiếu. Vui lòng chọn lại!
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors"
+        >
+          Quay lại chọn ngày
         </button>
       </div>
     );

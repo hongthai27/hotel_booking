@@ -97,12 +97,25 @@ export const simulateSuccess = async (transactionRef: string) => {
     throw new AppError(404, 'Không tìm thấy giao dịch');
   }
 
-  // Idempotent — trả về kết quả cũ nếu đã xử lý trước đó
   if (payment.status !== 'pending') {
     return {
       message: 'Giao dịch đã được xử lý trước đó',
       status: payment.status,
     };
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: payment.bookingId },
+    include: {
+      customer: true,
+      room: {
+        include: { roomType: true },
+      },
+    },
+  });
+
+  if (!booking) {
+    throw new AppError(404, 'Không tìm thấy đơn đặt phòng liên quan');
   }
 
   await prisma.$transaction(async (tx) => {
@@ -118,16 +131,12 @@ export const simulateSuccess = async (transactionRef: string) => {
 
     await tx.booking.update({
       where: { id: payment.bookingId },
-      data: { 
-        status: 'confirmed', 
-        paidAt: new Date(), 
-      },
+      data: { status: 'confirmed', paidAt: new Date() },
     });
 
-    // Tạo lịch sử kiểm toán cho giao dịch hệ thống tự xử lý
     await createAuditLog({
       tx,
-      actorId: 0, 
+      actorId: booking.userId, 
       targetTable: 'Payment',
       targetId: payment.id,
       action: 'UPDATE',
@@ -136,18 +145,6 @@ export const simulateSuccess = async (transactionRef: string) => {
     });
   });
 
-  // Lấy thông tin booking để gửi email xác nhận
-  const booking = await prisma.booking.findUnique({
-    where: { id: payment.bookingId },
-    include: {
-      customer: true,
-      room: {
-        include: { roomType: true },
-      },
-    },
-  });
-
-  // Fire-and-forget — không await để không block response
   if (booking?.customer) {
     sendBookingConfirmationEmail(
       {

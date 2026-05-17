@@ -7,9 +7,10 @@ import { toast } from 'react-hot-toast';
 
 import { useAuthStore } from '../../stores/authStore';
 
+// Đã gỡ bỏ giới hạn 6 ký tự để Backend tự kiểm tra
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Vui lòng nhập Email hoặc Số điện thoại'),
-  password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'), 
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -21,6 +22,7 @@ const LoginPage: React.FC = () => {
   
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string>(''); 
 
   const {
     register,
@@ -33,23 +35,18 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setIsSubmitting(true);
+      setLoginError(''); 
       
       await login(data.identifier, data.password);
       
       const currentUser = useAuthStore.getState().user;
-      
-      // Lấy URL cũ (hỗ trợ cả 2 tên biến phổ biến là 'redirect' và 'returnUrl')
       const redirectPath = searchParams.get('redirect') || searchParams.get('returnUrl');
       
-      // 1. Ưu tiên cao nhất: Có trang cũ đang xem dở thì trả về đúng trang đó
       if (redirectPath) {
         navigate(redirectPath, { replace: true });
         return;
       }
 
-      // 2. Nếu không có trang cũ: 
-      // - Admin/Lễ tân thì về trang quản trị
-      // - Khách hàng bình thường thì về Trang chủ 
       if (currentUser?.role === 'admin' || currentUser?.role === 'receptionist') {
         navigate('/admin/bookings', { replace: true });
       } else {
@@ -57,7 +54,20 @@ const LoginPage: React.FC = () => {
       }
       
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
+      let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+      if (
+        error?.response?.status === 400 || 
+        error?.response?.status === 401 || 
+        error?.response?.status === 404
+      ) {
+        errorMessage = 'Sai thông tin đăng nhập. Vui lòng kiểm tra lại!';
+      } 
+      // Bắt các lỗi cụ thể khác nếu có
+      else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      setLoginError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -71,9 +81,17 @@ const LoginPage: React.FC = () => {
         <p className="text-sm text-gray-500 mt-2">Chào mừng bạn quay trở lại</p>
       </div>
 
+      {/* Khung báo lỗi từ Server */}
+      {loginError && (
+        <div className="mb-5 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 animate-fade-in">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>{loginError}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        
-        {/* KHỐI EMAIL */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Email / Số điện thoại</label>
           <input
@@ -90,7 +108,6 @@ const LoginPage: React.FC = () => {
           )}
         </div>
 
-        {/* KHỐI MẬT KHẨU CÓ CHỨA LINK QUÊN MẬT KHẨU */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Mật khẩu</label>
           <div className="relative">
@@ -113,7 +130,6 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
           
-          {/* Căn 2 bên: Trái là lỗi, Phải là Quên mật khẩu */}
           <div className="flex items-center justify-between mt-0.5">
             <span className="text-xs text-red-500">
               {errors.password ? errors.password.message : ''}
@@ -127,7 +143,6 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* NÚT ĐĂNG NHẬP */}
         <button
           type="submit"
           disabled={isSubmitting}
