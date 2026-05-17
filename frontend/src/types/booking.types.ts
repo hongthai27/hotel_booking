@@ -11,12 +11,15 @@ export type PaymentMethod = 'qr_code' | 'cash' | 'card';
 
 export type BookingSource = 'online' | 'offline';
 
+export type PaymentFeeType = 'booking' | 'penalty' | 'refund';
+
 export interface Payment {
   id: number;
   bookingId: number;
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
+  feeType: PaymentFeeType; 
   transactionRef?: string;
   paidAt?: string;
   refundedAt?: string;
@@ -34,6 +37,7 @@ export interface Booking {
   totalAmount: number;
   source: BookingSource;
   status: BookingStatus;
+  paidAt?: string | null;
   cancelledAt?: string;
   cancelReason?: string;
   createdAt: string;

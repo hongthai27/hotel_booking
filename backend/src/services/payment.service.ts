@@ -48,6 +48,7 @@ export const initiatePayment = async (bookingId: number, userId: number) => {
       amount: booking.totalAmount,
       method: 'qr_code',
       status: 'pending',
+      feeType: 'booking',
       transactionRef: uuidv4(),
     },
   });
@@ -105,7 +106,9 @@ export const simulateSuccess = async (transactionRef: string) => {
   }
 
   await prisma.$transaction(async (tx) => {
-      await tx.payment.update({
+    const oldPayment = { ...payment };
+
+    const updatedPayment = await tx.payment.update({
       where: { transactionRef },
       data: {
         status: 'success',
@@ -113,9 +116,23 @@ export const simulateSuccess = async (transactionRef: string) => {
       },
     });
 
-      await tx.booking.update({
+    await tx.booking.update({
       where: { id: payment.bookingId },
-      data: { status: 'confirmed' },
+      data: { 
+        status: 'confirmed', 
+        paidAt: new Date(), 
+      },
+    });
+
+    // Tạo lịch sử kiểm toán cho giao dịch hệ thống tự xử lý
+    await createAuditLog({
+      tx,
+      actorId: 0, 
+      targetTable: 'Payment',
+      targetId: payment.id,
+      action: 'UPDATE',
+      oldValue: oldPayment,
+      newValue: updatedPayment,
     });
   });
 

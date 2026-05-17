@@ -314,11 +314,17 @@ export const cancelBooking = async (
     }
   }
 
-  const nonCancellableStatuses = ['checked_in', 'checked_out', 'cancelled'];
+  // Không cho hủy nếu đang ở hoặc đã trả phòng hoặc đã hủy
+if (['checked_in', 'checked_out', 'cancelled'].includes(booking.status)) {
+  throw new AppError(400, `Không thể hủy đơn ở trạng thái ${booking.status}`);
+}
 
-  if (nonCancellableStatuses.includes(booking.status)) {
-    throw new AppError(400, `Không thể hủy đơn ở trạng thái ${booking.status}`);
-  }
+// Phải là confirmed HOẶC đã thanh toán mới được hủy
+const canCancel = booking.status === 'confirmed' || booking.paidAt !== null;
+
+if (!canCancel) {
+  throw new AppError(400, 'Không thể hủy đơn ở trạng thái này');
+}
 
   const now = new Date();
   const daysUntilCheckIn = Math.ceil(
@@ -345,7 +351,10 @@ export const cancelBooking = async (
       },
     });
 
-    if (refundAmount > 0 && successPayment) {
+    if (successPayment) {
+      const penaltyAmount = Number(booking.totalAmount) - refundAmount;
+
+      // 1. Chuyển trạng thái giao dịch gốc thành đã hoàn tiền
       await tx.payment.update({
         where: { id: successPayment.id },
         data: {
@@ -353,6 +362,36 @@ export const cancelBooking = async (
           refundedAt: now,
         },
       });
+
+      // 2. Tạo bản ghi cho phần tiền trả lại khách (nếu có)
+      if (refundAmount > 0) {
+        await tx.payment.create({
+          data: {
+            bookingId: booking.id,
+            amount: refundAmount,
+            method: successPayment.method,
+            status: 'refunded',
+            feeType: 'refund',
+            refundedAt: now,
+            transactionRef: `REFUND-${successPayment.transactionRef ?? booking.id}`,
+          },
+        });
+      }
+
+      // 3. Tạo bản ghi cho phần tiền phạt khách sạn thu được (nếu có)
+      if (penaltyAmount > 0) {
+        await tx.payment.create({
+          data: {
+            bookingId: booking.id,
+            amount: penaltyAmount,
+            method: successPayment.method,
+            status: 'success',
+            feeType: 'penalty',
+            paidAt: now,
+            transactionRef: `PENALTY-${booking.id}-${Date.now()}`,
+          },
+        });
+      }
     }
 
     await createAuditLog({
@@ -579,6 +618,7 @@ export const createOfflineBooking = async (
         totalAmount,
         source: 'offline',
         status: 'confirmed',
+        paidAt: new Date(),
       },
     });
 
@@ -588,6 +628,7 @@ export const createOfflineBooking = async (
         amount: totalAmount,
         method: data.paymentMethod,
         status: 'success',
+        feeType: 'booking',
         paidAt: new Date(),
         transactionRef: `OFFLINE-${booking.id}-${Date.now()}`,
       },
@@ -704,9 +745,9 @@ export const updateOfflineBooking = async (
         data: {
           bookingId,
           amount: Math.abs(priceDiff),
-          // Thu thêm nếu giá tăng, hoàn tiền nếu giá giảm
           method: 'cash',
-          status: priceDiff > 0 ? 'success' : 'refunded',
+          status: 'success', // Đổi status thành success
+          feeType: priceDiff > 0 ? 'booking' : 'refund', // Thêm dòng feeType
           paidAt: new Date(),
           ...(priceDiff < 0 && { refundedAt: new Date() }),
           transactionRef: `OFFLINE-ADJ-${bookingId}-${Date.now()}`,

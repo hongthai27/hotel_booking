@@ -60,6 +60,12 @@ enum AuditAction {
   DELETE
 }
 
+enum PaymentFeeType {
+  booking
+  penalty
+  refund
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -169,6 +175,7 @@ model Booking {
   totalAmount  Decimal       @map("total_amount") @db.Decimal(12, 2)
   source       BookingSource @default(online) @map("source")
   status       BookingStatus @default(pending_payment) @map("status")
+  paidAt       DateTime?     @map("paid_at")
   cancelledAt  DateTime?     @map("cancelled_at")
   cancelReason String?       @map("cancel_reason") @db.VarChar(255)
   createdAt    DateTime      @default(now()) @map("created_at")
@@ -194,6 +201,7 @@ model Payment {
   amount         Decimal       @map("amount") @db.Decimal(12, 2)
   method         PaymentMethod @map("method")
   status         PaymentStatus @default(pending) @map("status")
+  feeType        PaymentFeeType @default(booking) @map("fee_type")
   transactionRef String?       @unique @map("transaction_ref") @db.VarChar(255)
   paidAt         DateTime?     @map("paid_at")
   refundedAt     DateTime?     @map("refunded_at")

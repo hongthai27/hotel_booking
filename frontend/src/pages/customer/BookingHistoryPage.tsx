@@ -5,22 +5,8 @@ import { useCancelBooking } from '../../hooks/mutations/use-booking.mutation';
 import { useSocketBooking } from '../../hooks/useSocketBooking';
 import type { Booking, BookingStatus } from '../../types/booking.types';
 import { formatVND, formatDate, calcNights } from '../../utils/format';
-
-const STATUS_LABEL: Record<string, string> = {
-  pending_payment: 'Chờ thanh toán',
-  confirmed: 'Đã xác nhận',
-  checked_in: 'Đang ở',
-  checked_out: 'Đã trả phòng',
-  cancelled: 'Đã hủy',
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  pending_payment: 'bg-yellow-50 text-yellow-700',
-  confirmed: 'bg-green-50 text-green-700',
-  checked_in: 'bg-blue-50 text-blue-700',
-  checked_out: 'bg-purple-50 text-purple-700',
-  cancelled: 'bg-gray-100 text-gray-500',
-};
+import BookingStatusBadge from '../../components/common/BookingStatusBadge';
+import PaymentStatusBadge from '../../components/common/PaymentStatusBadge';
 
 const TABS: { label: string; value: BookingStatus | undefined }[] = [
   { label: 'Tất cả', value: undefined },
@@ -66,9 +52,10 @@ const BookingCard = ({
               </p>
             )}
           </div>
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${STATUS_CLASS[booking.status]}`}>
-            {STATUS_LABEL[booking.status]}
-          </span>
+          <div className="flex gap-2 flex-wrap">
+            <BookingStatusBadge status={booking.status} />
+            <PaymentStatusBadge paidAt={booking.paidAt} />
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 font-normal">

@@ -13,22 +13,9 @@ import { useSocketAllBookings } from '../../hooks/useSocketBooking';
 import { formatDate } from '../../utils/format';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import BookingStatusBadge from '../../components/common/BookingStatusBadge';
+import PaymentStatusBadge from '../../components/common/PaymentStatusBadge';
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_payment: 'Chờ thanh toán',
-  confirmed: 'Đã xác nhận',
-  checked_in: 'Đang ở',
-  checked_out: 'Đã trả phòng',
-  cancelled: 'Đã hủy',
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  pending_payment: 'bg-yellow-50 text-yellow-700',
-  confirmed: 'bg-green-50 text-green-700',
-  checked_in: 'bg-blue-50 text-blue-700',
-  checked_out: 'bg-purple-50 text-purple-700',
-  cancelled: 'bg-gray-100 text-gray-500',
-};
 
 const SOURCE_LABEL: Record<string, string> = {
   online: 'Trực tuyến',
@@ -432,9 +419,10 @@ const BookingListPage = () => {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_CLASS[booking.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {STATUS_LABEL[booking.status] ?? booking.status}
-                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                      <BookingStatusBadge status={booking.status} />
+                      <PaymentStatusBadge paidAt={booking.paidAt} />
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
