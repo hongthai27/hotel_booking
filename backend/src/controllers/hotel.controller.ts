@@ -4,6 +4,7 @@ import { successResponse } from '../utils/response.util';
 import { catchAsync } from '../utils/catch-async.util';
 import { RoomStatus } from '@prisma/client';
 import { SearchAvailableDto } from '../validations/hotel.schema';
+import { AppError } from '../utils/app-error.util';
 
 // ── RoomType ───────────────────────────────────────────────────────────────────
 
@@ -30,12 +31,19 @@ export const createRoomType = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const updateRoomType = catchAsync(async (req: Request, res: Response) => {
-  const roomType = await hotelService.updateRoomType(
+  const { version, ...data } = req.body;
+  
+  if (version === undefined) {
+    throw new AppError(400, 'Thiếu thông tin version để kiểm tra xung đột');
+  }
+  
+  const updated = await hotelService.updateRoomType(
     Number(req.params.id),
-    req.body,
+    { ...data, version: Number(version) }, // <-- Ép kiểu Number ở đây
     req.user!.userId
   );
-  successResponse(res, roomType, 'Cập nhật loại phòng thành công');
+  
+  successResponse(res, updated, 'Cập nhật hạng phòng thành công');
 });
 
 export const deleteRoomType = catchAsync(async (req: Request, res: Response) => {
@@ -74,12 +82,20 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateRoomStatus = catchAsync(async (req: Request, res: Response) => {
-  const room = await hotelService.updateRoomStatus(
+  const { status, version } = req.body;
+  
+  if (version === undefined) {
+    throw new AppError(400, 'Thiếu version');
+  }
+  
+  const updated = await hotelService.updateRoomStatus(
     Number(req.params.id),
-    req.body.status,
+    status,
+    Number(version), // <-- Ép kiểu Number ở đây
     req.user!.userId
   );
-  successResponse(res, room, 'Cập nhật trạng thái phòng thành công');
+  
+  successResponse(res, updated, 'Cập nhật trạng thái phòng thành công');
 });
 
 // ── Search ─────────────────────────────────────────────────────────────────────

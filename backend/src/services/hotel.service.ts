@@ -95,7 +95,11 @@ export const createRoomType = async (data: RoomTypeDto, actorId: number) => {
   });
 };
 
-export const updateRoomType = async (id: number, data: RoomTypeDto, actorId: number) => {
+export const updateRoomType = async (
+  id: number,
+  data: RoomTypeDto & { version: number },
+  actorId: number
+) => {
   const existing = await prisma.roomType.findUnique({
     where: { id },
   });
@@ -104,18 +108,30 @@ export const updateRoomType = async (id: number, data: RoomTypeDto, actorId: num
     throw new AppError(404, 'Không tìm thấy loại phòng');
   }
 
+  // Optimistic locking — kiểm tra version trước khi update
+  if (existing.version !== data.version) {
+    throw new AppError(
+      409,
+      'Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang và thử lại.'
+    );
+  }
+
   const imageUrls = data.images && data.images.length > 0
     ? await Promise.all(data.images.map((image) => uploadImage(image)))
     : [];
 
   return prisma.$transaction(async (tx) => {
+    // Dùng where.version để đảm bảo atomic — nếu version đã thay đổi trước khi update thì Prisma ném lỗi
     const updated = await tx.roomType.update({
-      where: { id },
+      where: {
+        id,
+        version: data.version,
+      },
       data: {
-        typeName: data.typeName,
-        description: data.description,
-        maxCapacity: data.maxCapacity,
-        basePrice: data.basePrice,
+        ...(data.typeName && { typeName: data.typeName }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.maxCapacity && { maxCapacity: data.maxCapacity }),
+        ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
         amenities: {
           deleteMany: {},
           create: data.amenityIds.map((amenityId) => ({ amenityId })),
@@ -129,7 +145,15 @@ export const updateRoomType = async (id: number, data: RoomTypeDto, actorId: num
             })),
           },
         }),
+        // Auto increment version sau mỗi lần update thành công
+        version: { increment: 1 },
       },
+    }).catch(() => {
+      // Nếu update thất bại do version conflict
+      throw new AppError(
+        409,
+        'Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang và thử lại.'
+      );
     });
 
     await createAuditLog({
@@ -138,8 +162,8 @@ export const updateRoomType = async (id: number, data: RoomTypeDto, actorId: num
       targetTable: 'RoomType',
       targetId: id,
       action: 'UPDATE',
-      oldValue: existing,
-      newValue: updated,
+      oldValue: { ...existing, version: existing.version },
+      newValue: { ...updated, version: updated.version },
     });
 
     return updated;
@@ -327,46 +351,72 @@ export const updateRoom = async (id: number, data: Partial<RoomDto>, actorId: nu
 };
 
 export const updateRoomStatus = async (
-  id: number,
-  status: RoomStatus,
+  roomId: number,
+  newStatus: string,
+  currentVersion: number,
   actorId: number
 ) => {
-  const existing = await prisma.room.findUnique({ where: { id } });
-
-  if (!existing) {
-    throw new AppError(404, 'Không tìm thấy phòng');
-  }
-
-  const blockedStatuses: RoomStatus[] = ['maintenance', 'cleaning'];
-
-  if (blockedStatuses.includes(status)) {
-    const activeBooking = await prisma.booking.findFirst({
-      where: {
-        roomId: id,
-        status: { in: ['confirmed', 'checked_in'] as BookingStatus[] },
-        checkOutDate: { gt: new Date() },
-      },
+  return prisma.$transaction(async (tx) => {
+    const room = await tx.room.findUnique({
+      where: { id: roomId },
     });
 
-    if (activeBooking) {
-      throw new AppError(400, 'Không thể vô hiệu hóa phòng đang có đơn đặt phòng');
+    if (!room) {
+      throw new AppError(404, 'Không tìm thấy phòng');
     }
-  }
 
-  return prisma.$transaction(async (tx) => {
+    // Optimistic locking — kiểm tra version ở memory trước
+    if (room.version !== currentVersion) {
+      throw new AppError(
+        409,
+        'Trạng thái phòng vừa được thay đổi bởi nhân viên khác. Vui lòng tải lại.'
+      );
+    }
+
+    // Không cho chuyển sang maintenance/cleaning nếu còn booking active
+    if (['maintenance', 'cleaning'].includes(newStatus)) {
+      const activeBooking = await tx.booking.findFirst({
+        where: {
+          roomId,
+          status: { in: ['confirmed', 'checked_in'] },
+          checkOutDate: { gt: new Date() },
+        },
+      });
+
+      if (activeBooking) {
+        throw new AppError(
+          400,
+          'Không thể vô hiệu hóa phòng đang có đơn đặt phòng'
+        );
+      }
+    }
+
+    // Khóa atomic: Đảm bảo version khớp 100% lúc chạm vào DB
     const updated = await tx.room.update({
-      where: { id },
-      data: { status },
+      where: { 
+        id: roomId,
+        version: currentVersion // <-- Chốt chặn an toàn thêm vào đây
+      },
+      data: {
+        status: newStatus as any,
+        version: { increment: 1 }, // Tự động tăng version
+      },
+    }).catch(() => {
+      // Bắt lỗi nếu version bị thay đổi trong tíc tắc
+      throw new AppError(
+        409,
+        'Trạng thái phòng vừa được thay đổi bởi nhân viên khác. Vui lòng tải lại.'
+      );
     });
 
     await createAuditLog({
       tx,
       actorId,
       targetTable: 'Room',
-      targetId: id,
+      targetId: roomId,
       action: 'UPDATE',
-      oldValue: { status: existing.status },
-      newValue: { status: updated.status },
+      oldValue: { status: room.status, version: room.version },
+      newValue: { status: newStatus, version: updated.version },
     });
 
     return updated;

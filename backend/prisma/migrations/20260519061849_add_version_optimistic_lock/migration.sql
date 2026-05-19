@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `room` ADD COLUMN `version` INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE `room_type` ADD COLUMN `version` INTEGER NOT NULL DEFAULT 0;
