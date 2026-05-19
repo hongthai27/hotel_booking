@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCreateRoomType, useUpdateRoomType, useUpdateRoomStatus } from '../../hooks/mutations/useRoomTypeMutation';
 import { useAdminRoomTypes } from '../../hooks/queries/useAdminBookingsQuery';
-import { adminService } from '../../services/adminService';
 
 // ── Schema Validation cho Form ──
 const roomTypeSchema = z.object({
@@ -57,7 +56,7 @@ const RoomTypeFormModal = ({
   onClose: () => void;
   defaultValues?: any;
 }) => {
-  const queryClient = useQueryClient();
+
 
   const {
     register,
@@ -80,18 +79,9 @@ const RoomTypeFormModal = ({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
-  // ── Mutation Tạo/Sửa Hạng Phòng ──
-  const { mutate: createRoomType, isPending } = useMutation({
-    mutationFn: (formData: FormData) => adminService.createRoomType(formData),
-    onSuccess: () => {
-      onClose();
-      queryClient.invalidateQueries({ queryKey: ['admin', 'room-types'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
-    },
-    onError: (error) => {
-      console.error('Lỗi khi lưu hạng phòng:', error);
-    }
-  });
+ const { mutate: createRoomType, isPending: isCreating } = useCreateRoomType();
+  const { mutate: updateRoomType, isPending: isUpdating } = useUpdateRoomType();
+  const isPending = isCreating || isUpdating;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -112,23 +102,25 @@ const RoomTypeFormModal = ({
     );
   };
 
+  // ── HÀM SUBMIT XỬ LÝ DỮ LIỆU GỬI ĐI ──
   const onSubmit = (data: RoomTypeFormValues) => {
     const formData = new FormData();
 
     formData.append('typeName', data.typeName);
     if (data.description) formData.append('description', data.description);
-    formData.append('maxCapacity', data.maxCapacity.toString());
-    formData.append('basePrice', data.basePrice.toString());
+    formData.append('maxCapacity', String(data.maxCapacity));
+    formData.append('basePrice', String(data.basePrice));
 
-    selectedAmenities.forEach((id) => {
-      formData.append('amenities[]', id.toString());
-    });
+    selectedAmenities.forEach((id) => formData.append('amenityIds', String(id)));
+    imageFiles.forEach((file) => formData.append('images', file));
 
-    imageFiles.forEach((file) => {
-      formData.append('images[]', file);
-    });
-
-    createRoomType(formData);
+    if (defaultValues?.id) {
+      // Gửi version lên để backend kiểm tra conflict
+      formData.append('version', String(defaultValues.version)); 
+      updateRoomType({ id: defaultValues.id, data: formData });
+    } else {
+      createRoomType(formData);
+    }
   };
 
   return (
@@ -296,7 +288,7 @@ const RoomTypeFormModal = ({
 
 // ── COMPONENT CHÍNH ──
 const RoomTypeListPage = () => {
-  const queryClient = useQueryClient();
+ 
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   
@@ -306,14 +298,7 @@ const RoomTypeListPage = () => {
   // Hook gọi API lấy danh sách hạng phòng
   const { data: roomTypes, isLoading } = useAdminRoomTypes();
 
-  // Mutation cập nhật trạng thái phòng đơn lẻ
-  const { mutate: updateStatus, isPending: isUpdatingStatus } = useMutation({
-    mutationFn: ({ roomId, status }: { roomId: number, status: string }) => 
-      adminService.updateRoomStatus(roomId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
-    },
-  });
+  const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateRoomStatus();
 
   const toggleExpand = (id: number) => {
     setExpandedRoomTypeId(prev => (prev === id ? null : id));
@@ -471,7 +456,7 @@ const RoomTypeListPage = () => {
                                   <select
                                     value={room.status}
                                     disabled={isUpdatingStatus}
-                                    onChange={(e) => updateStatus({ roomId: room.id, status: e.target.value })}
+                                    onChange={(e) => updateStatus({ id: room.id, status: e.target.value })}
                                     className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 cursor-pointer"
                                   >
                                     <option value="available">Trống</option>

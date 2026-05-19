@@ -26,7 +26,7 @@ const RoomCard = ({ id, name, image, price, maxCapacity, availableRooms }: RoomC
 
   return (
     <div 
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col"
+      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col h-full"
       onClick={handleCardClick} 
     >
       <div className="h-52 w-full">
@@ -64,7 +64,7 @@ const RoomCard = ({ id, name, image, price, maxCapacity, availableRooms }: RoomC
               e.stopPropagation();
               handleCardClick();
             }}
-            className="px-5 py-2.5 bg-[#004b8f] text-white rounded-xl text-sm font-medium hover:bg-blue-900 transition-colors"
+           className="px-5 py-2.5 bg-[#004b8f] text-white rounded-xl text-sm font-medium hover:bg-blue-900 transition-colors shrink-0 whitespace-nowrap"
           >
             Xem chi tiết
           </button> 

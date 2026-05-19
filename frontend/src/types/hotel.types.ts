@@ -18,6 +18,7 @@ export interface RoomType {
   description?: string;
   maxCapacity: number;
   basePrice: number;
+  version: number; 
   images: RoomImage[];
   amenities: Amenity[];
   availableRoomCount?: number;

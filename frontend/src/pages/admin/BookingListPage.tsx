@@ -355,7 +355,7 @@ const BookingListPage = () => {
         </button>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-wrap gap-3">
+      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           placeholder="Tìm theo tên khách, mã đơn..."
@@ -390,7 +390,7 @@ const BookingListPage = () => {
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 {['Mã đơn', 'Khách', 'Phòng', 'Nhận phòng', 'Trả phòng', 'Nguồn', 'Trạng thái', 'Thao tác'].map((col) => (
@@ -515,7 +515,7 @@ const BookingListPage = () => {
         </div>
 
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-100">
             <span className="text-xs text-gray-500">
               Trang {pagination.page} / {pagination.totalPages} ({pagination.total} đơn)
             </span>

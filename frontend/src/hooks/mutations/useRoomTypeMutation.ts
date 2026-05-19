@@ -90,9 +90,13 @@ export const useUpdateRoomStatus = () => {
       )
     },
 
-    onError: (e: any) =>
-      toast.error(
-        e.response?.data?.message ?? 'Cập nhật thất bại'
-      ),
+    onError: (e: any) => {
+      if (e.response?.status === 409) {
+        toast.error('Dữ liệu vừa bị thay đổi bởi người khác. Đang tải lại...');
+        invalidate(queryClient); 
+      } else {
+        toast.error(e.response?.data?.message ?? 'Cập nhật thất bại');
+      }
+    },
   })
 }

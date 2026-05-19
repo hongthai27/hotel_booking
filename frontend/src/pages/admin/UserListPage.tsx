@@ -119,8 +119,8 @@ const UserListPage = () => {
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
+          <table className="w-full text-sm min-w-[800px]">
+    <thead className="bg-gray-50 border-b border-gray-100">
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['Họ tên', 'Email', 'SĐT', 'Vai trò', 'Trạng thái', 'Hành động'].map((col) => (
                   <th key={col} className="text-left px-4 py-3 text-xs font-medium text-gray-500">
@@ -148,21 +148,21 @@ const UserListPage = () => {
 
               {!isLoading && users.map((user: any) => (
                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-800 font-medium">
-                    {user.fullName}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{user.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{user.phoneNumber}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_CLASS[user.role] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {ROLE_LABEL[user.role] ?? user.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_CLASS[user.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {STATUS_LABEL[user.status] ?? user.status}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">
+                      {user.fullName}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{user.email}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{user.phoneNumber}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_CLASS[user.role] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {ROLE_LABEL[user.role] ?? user.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_CLASS[user.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {STATUS_LABEL[user.status] ?? user.status}
+                      </span>
+                    </td>
                   <td className="px-4 py-3">
                     <select
                       defaultValue=""
