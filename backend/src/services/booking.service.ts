@@ -363,7 +363,7 @@ export const cancelBooking = async (
             bookingId: booking.id,
             amount: refundAmount,
             method: successPayment.method,
-            status: 'pending', 
+            status: 'pending_refund',
             feeType: 'refund',
             transactionRef: `REFUND-${successPayment.transactionRef ?? booking.id}`,
           },
@@ -431,7 +431,7 @@ export const confirmRefund = async (bookingId: number, staffId: number) => {
   if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
 
   // Tìm giao dịch hoàn tiền đang ở trạng thái pending
-  const pendingRefund = booking.payments.find(p => p.feeType === 'refund' && p.status === 'pending');
+  const pendingRefund = booking.payments.find(p => p.feeType === 'refund' && p.status === 'pending_refund');
   
   if (!pendingRefund) {
     throw new AppError(400, 'Không tìm thấy yêu cầu hoàn tiền nào đang chờ xử lý cho đơn này');
@@ -453,7 +453,7 @@ export const confirmRefund = async (bookingId: number, staffId: number) => {
       targetTable: 'Payment',
       targetId: pendingRefund.id,
       action: 'UPDATE',
-      oldValue: { status: 'pending' },
+      oldValue: { status: 'pending_refund' },
       newValue: { status: 'refunded' }
     });
   });

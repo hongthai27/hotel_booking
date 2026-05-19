@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 
 const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
@@ -10,14 +10,36 @@ const formatDate = (dateStr: string) => {
 };
 
 const RefundListPage = () => {
+  const queryClient = useQueryClient();
+
   const { data: refunds, isLoading } = useQuery({
     queryKey: ['admin', 'refunds'],
     queryFn: () =>
       api.get<{ data: any[] }>('/admin/refunds').then((r) => r.data.data),
   });
 
+  // ĐOẠN MỚI: API Xác nhận hoàn tiền
+  const confirmMutation = useMutation({
+    mutationFn: (paymentId: number) => api.patch(`/admin/payments/${paymentId}/confirm-refund`),
+    onSuccess: () => {
+      // Gọi lại API lấy danh sách để tự động cập nhật UI
+      queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
+      alert('Xác nhận hoàn tiền thành công!');
+    },
+    onError: () => {
+      alert('Có lỗi xảy ra khi xác nhận!');
+    }
+  });
+
+  const handleConfirmRefund = (paymentId: number) => {
+    if (window.confirm('Xác nhận bạn đã chuyển khoản hoàn tiền cho khách hàng này?')) {
+      confirmMutation.mutate(paymentId);
+    }
+  };
+
+  // Chỉ tính tổng tiền của những đơn ĐÃ HOÀN (refunded)
   const totalRefunded = refunds?.reduce(
-    (sum, r) => sum + Number(r.amount),
+    (sum, r) => sum + (r.status === 'refunded' ? Number(r.amount) : 0),
     0
   ) ?? 0;
 
@@ -32,7 +54,7 @@ const RefundListPage = () => {
           {formatVND(totalRefunded)}
         </p>
         <span className="text-xs text-gray-400">
-          {refunds?.length ?? 0} giao dịch
+          {refunds?.filter(r => r.status === 'refunded').length ?? 0} giao dịch đã hoàn
         </span>
       </div>
 
@@ -42,7 +64,8 @@ const RefundListPage = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Mã GD', 'Khách hàng', 'Phòng', 'Số tiền hoàn', 'Ngày hoàn', 'Mã đơn'].map((col) => (
+                {/* ĐOẠN MỚI: Thêm cột Trạng thái/Thao tác */}
+                {['Mã GD', 'Khách hàng', 'Phòng', 'Số tiền hoàn', 'Ngày hoàn', 'Mã đơn', 'Trạng thái'].map((col) => (
                   <th key={col} className="text-left px-4 py-3 text-xs font-medium text-gray-500">
                     {col}
                   </th>
@@ -52,7 +75,7 @@ const RefundListPage = () => {
             <tbody className="divide-y divide-gray-50">
               {isLoading && (
                 <tr>
-                  <td colSpan={6} className="text-center py-16">
+                  <td colSpan={7} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       <span className="text-sm text-gray-400">Đang tải...</span>
@@ -63,7 +86,7 @@ const RefundListPage = () => {
 
               {!isLoading && (!refunds || refunds.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="text-center py-16 text-gray-400 text-sm">
+                  <td colSpan={7} className="text-center py-16 text-gray-400 text-sm">
                     Chưa có giao dịch hoàn tiền nào
                   </td>
                 </tr>
@@ -93,6 +116,25 @@ const RefundListPage = () => {
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-sm">
                     #{refund.bookingId}
+                  </td>
+                  
+                  {/* ĐOẠN MỚI: Nút Thao tác dựa trên status */}
+                  <td className="px-4 py-3">
+                    {refund.status === 'pending_refund' ? (
+                      <button
+                        onClick={() => handleConfirmRefund(refund.id)}
+                        disabled={confirmMutation.isPending}
+                        className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors whitespace-nowrap"
+                      >
+                        {confirmMutation.isPending ? 'Đang xử lý...' : 'Xác nhận đã hoàn'}
+                      </button>
+                    ) : refund.status === 'refunded' ? (
+                      <span className="text-xs font-medium px-2.5 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
+                        Đã hoàn tiền
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">{refund.status}</span>
+                    )}
                   </td>
                 </tr>
               ))}

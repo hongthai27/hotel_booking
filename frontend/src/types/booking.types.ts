@@ -5,7 +5,7 @@ export type BookingStatus =
   | 'checked_out'
   | 'cancelled';
 
-export type PaymentStatus = 'pending' | 'success' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'success' | 'failed' | 'pending_refund' | 'refunded';
 
 export type PaymentMethod = 'qr_code' | 'cash' | 'card';
 
