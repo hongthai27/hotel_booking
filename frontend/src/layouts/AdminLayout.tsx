@@ -1,10 +1,21 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { useSocketNewBooking } from '../hooks/useSocketBooking';
+import type { NewBookingPayload } from '../hooks/useSocketBooking';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
   receptionist: 'Lễ tân',
+};
+
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 const AdminLayout = () => {
@@ -12,7 +23,51 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ── Notification state ─────────────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<NewBookingPayload[]>([]);
+  const [showNotif, setShowNotif] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef<HTMLDivElement>(null);
+
   const isAdmin = user?.role === 'admin';
+
+  // ── Socket listener ────────────────────────────────────────────────────────
+  const handleNewBooking = useCallback((payload: NewBookingPayload) => {
+    setNotifications((prev) => [payload, ...prev].slice(0, 20));
+    setUnreadCount((prev) => prev + 1);
+
+    // Âm thanh thông báo nhẹ
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {}
+  }, []);
+
+  useSocketNewBooking(handleNewBooking);
+
+  // ── Click outside đóng dropdown ──
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotif(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleOpenNotif = () => {
+    setShowNotif((prev) => !prev);
+    setUnreadCount(0);
+  };
 
   const handleLogout = () => {
     logout();
@@ -70,7 +125,43 @@ const AdminLayout = () => {
             </svg>
           </button>
 
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-4 ml-auto">
+             {/* Notification Bell */}
+             <div className="relative" ref={notifRef}>
+              <button onClick={handleOpenNotif} className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                🔔
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-medium rounded-full flex items-center justify-center px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              
+              {showNotif && (
+                <div className="absolute right-0 top-12 w-80 bg-white border border-gray-100 rounded-2xl shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-medium">Thông báo mới</span>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} className="text-xs text-gray-400">Xóa tất cả</button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-gray-400">Không có đơn mới</div>
+                    ) : (
+                      notifications.map((notif, idx) => (
+                        <Link key={idx} to="/admin/bookings" className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-50" onClick={() => setShowNotif(false)}>
+                          <p className="text-xs font-medium">Đơn mới #{notif.bookingId}</p>
+                          <p className="text-xs text-gray-500">{notif.guestName} - {notif.roomTypeName}</p>
+                          <p className="text-[10px] text-gray-400">Ngày đến: {formatDate(notif.checkInDate)}</p>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {user?.role && (
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                 user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700'
@@ -78,6 +169,7 @@ const AdminLayout = () => {
                 {ROLE_LABEL[user.role] ?? user.role}
               </span>
             )}
+            
             <span className="text-sm font-medium text-gray-800 hidden sm:inline-block">
               {user?.fullName}
             </span>
