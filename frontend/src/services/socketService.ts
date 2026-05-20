@@ -4,6 +4,7 @@ export const SOCKET_EVENTS = {
   BOOKING_UPDATED: 'booking:updated',
   ROOM_UPDATED: 'room:updated',
   PAYMENT_CONFIRMED: 'payment:confirmed',
+  BOOKING_NEW: 'booking:new',
 } as const;
 
 type SocketEvent = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

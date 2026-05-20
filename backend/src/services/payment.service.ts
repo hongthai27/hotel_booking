@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
 import { createAuditLog } from '../utils/audit-log.util';
 import { sendBookingConfirmationEmail } from '../utils/email.util';
-import { emitPaymentConfirmed, emitBookingUpdate } from '../utils/socket.util';
+import { emitPaymentConfirmed, emitBookingUpdate, emitNewBooking } from '../utils/socket.util';
 
 // Tạo QR payload giả lập, chứa thông tin giao dịch để frontend hiển thị mã QR
 const buildQrPayload = (
@@ -145,7 +145,21 @@ export const simulateSuccess = async (transactionRef: string) => {
     });
   });
 
+  // PHÁT SỰ KIỆN SOCKET CHO KHÁCH HÀNG
+  emitPaymentConfirmed(payment.bookingId);
+  emitBookingUpdate(payment.bookingId, { status: 'confirmed' });
+
+  // GỬI EMAIL & PHÁT SỰ KIỆN SOCKET CHO LỄ TÂN/ADMIN
   if (booking?.customer) {
+    // Báo đơn mới lên hệ thống nội bộ
+    emitNewBooking({
+      bookingId: booking.id,
+      roomTypeName: booking.room.roomType.typeName,
+      guestName: booking.customer.fullName,
+      checkInDate: booking.checkInDate,
+    });
+
+    // Fire and forget - Không block luồng response
     sendBookingConfirmationEmail(
       {
         id: booking.id,
