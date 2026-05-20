@@ -17,3 +17,22 @@ export const uploadImage = async (filePath: string): Promise<string> => {
 export const deleteImage = async (publicId: string): Promise<void> => {
   await cloudinary.uploader.destroy(publicId);
 };
+
+export const deleteCloudinaryImage = async (imageUrl: string): Promise<void> => {
+  try {
+    if (!imageUrl || !imageUrl.includes('cloudinary.com')) return;
+
+    // Tự động tách URL để lấy public_id (bao gồm cả tên folder 'hotel-booking')
+    const urlParts = imageUrl.split('/upload/');
+    if (urlParts.length === 2) {
+      const afterUpload = urlParts[1]; 
+      const pathWithoutVersion = afterUpload.replace(/^v\d+\//, ''); 
+      const publicId = pathWithoutVersion.substring(0, pathWithoutVersion.lastIndexOf('.')); 
+      
+      await cloudinary.uploader.destroy(publicId);
+      console.log(`[Cloudinary] Đã xóa ảnh rác: ${publicId}`);
+    }
+  } catch (err) {
+    console.error('[Cloudinary] Xóa ảnh thất bại:', err);
+  }
+};

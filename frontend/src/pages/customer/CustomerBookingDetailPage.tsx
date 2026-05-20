@@ -43,7 +43,6 @@ const CustomerBookingDetailPage = () => {
     cancelled: { label: 'Đã hủy', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
   } as Record<string, { label: string; cls: string }>)[booking.status]) ?? { label: booking.status, cls: 'bg-gray-100 text-gray-500 border-gray-200' };
 
-  // Lấy đúng giao dịch thanh toán gốc (tránh nhầm với lệnh hoàn tiền)
   const bookingPayment = booking.payments?.find((p: any) => p.feeType === 'booking') || booking.payments?.[0];
 
   const PAY_METHOD = (({
@@ -52,7 +51,6 @@ const CustomerBookingDetailPage = () => {
     card: 'Quẹt thẻ',
   } as Record<string, string>)[bookingPayment?.method ?? '']) ?? '—';
 
-  // HÀM MỚI: Xử lý trạng thái thanh toán chuẩn xác giống hệt trang Lịch sử
   const getPaymentStatus = () => {
     if (booking.status === 'cancelled') {
       const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
@@ -106,7 +104,9 @@ const CustomerBookingDetailPage = () => {
           src={booking.room?.roomType?.images?.[0]?.imageUrl ?? PLACEHOLDER}
           alt={booking.room?.roomType?.typeName}
           className="w-full h-48 object-cover"
-          onError={(e) => { e.currentTarget.src = PLACEHOLDER }}
+          onError={(e) => { 
+            (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+          }}
         />
 
         <div className="p-5">
@@ -158,7 +158,6 @@ const CustomerBookingDetailPage = () => {
             <span className={`font-medium ${PAY_STATUS.cls}`}>{PAY_STATUS.label}</span>
           </div>
           
-          {/* Lấy đúng giao dịch thanh toán gốc để hiển thị */}
           {bookingPayment?.paidAt && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Thời gian thanh toán</span>
@@ -181,14 +180,12 @@ const CustomerBookingDetailPage = () => {
             </span>
           </div>
 
-          {/* Banner báo đang xử lý hoàn tiền */}
           {booking.status === 'cancelled' && booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending') && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700 mt-2">
               <span>Đang xử lý hoàn tiền (dự kiến 3–5 ngày làm việc)</span>
             </div>
           )}
 
-          {/* Banner báo đã hoàn tiền thành công */}
           {booking.status === 'cancelled' && booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded') && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-700 mt-2">
               <span>Đã hoàn tiền thành công</span>

@@ -1,3 +1,5 @@
+const PLACEHOLDER = 'https://placehold.co/1200x800?text=Hotel+Booking';
+
 const AboutPage = () => {
   return (
     <div className="max-w-4xl mx-auto py-16 px-6">
@@ -6,11 +8,14 @@ const AboutPage = () => {
       </h1>
       
       <div className="flex flex-col gap-10 leading-relaxed text-gray-600">
-        <div className="w-full h-80 rounded-3xl overflow-hidden shadow-sm">
+        <div className="w-full h-80 rounded-3xl overflow-hidden shadow-sm bg-gray-100">
           <img 
             src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200" 
             alt="Hotel Lobby" 
             className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+            }}
           />
         </div>
 

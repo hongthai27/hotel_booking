@@ -18,6 +18,8 @@ const TABS: { label: string; value: BookingStatus | undefined }[] = [
 
 const CANCELLABLE: BookingStatus[] = ['pending_payment', 'confirmed'];
 
+const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
+
 const BookingCard = ({
   booking,
   setCancelTarget,
@@ -78,10 +80,15 @@ const BookingCard = ({
       onClick={() => navigate(`/bookings/${booking.id}`)}
       className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col sm:flex-row cursor-pointer hover:shadow-md transition-shadow"
     >
-      <div className="sm:w-40 h-36 sm:h-auto shrink-0 bg-gradient-to-br from-primary to-primary-dark">
-        {image && (
-          <img src={image} alt="" className="w-full h-full object-cover" />
-        )}
+      <div className="sm:w-40 h-36 sm:h-auto shrink-0 bg-gray-100">
+        <img
+          src={image ?? PLACEHOLDER}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+          }}
+        />
       </div>
 
       <div className="flex-1 p-5 flex flex-col gap-3">

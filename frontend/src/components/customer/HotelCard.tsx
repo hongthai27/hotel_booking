@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import type { RoomType } from '../../types/hotel.types';
 
+const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
+
 interface Props {
   roomType: RoomType;
   checkIn?: string;
@@ -30,25 +32,24 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
       onClick={handleClick}
       className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
     >
-      {/* Image */}
       {image ? (
         <img
           src={image}
           alt={roomType.typeName}
           className="w-full h-48 object-cover"
           onError={(e) => {
-            e.currentTarget.style.display = 'none';
+            (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
           }}
         />
       ) : (
-        <div className="w-full h-48 bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
-          <span className="text-white/60 text-sm font-normal">Chưa có ảnh</span>
-        </div>
+        <img
+          src={PLACEHOLDER}
+          alt={roomType.typeName}
+          className="w-full h-48 object-cover"
+        />
       )}
 
-      {/* Content */}
       <div className="p-5 flex flex-col gap-3">
-        {/* Tên + sức chứa */}
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-gray-800 font-medium text-base leading-snug">
             {roomType.typeName}
@@ -70,7 +71,6 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
           Tối đa {roomType.maxCapacity} khách
         </p>
 
-        {/* Amenities */}
         {visibleAmenities.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {visibleAmenities.map((amenity, index) => (
@@ -89,7 +89,6 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
           </div>
         )}
 
-        {/* Giá + CTA */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div>
             <span className="text-xs text-gray-400 font-normal">Từ</span>

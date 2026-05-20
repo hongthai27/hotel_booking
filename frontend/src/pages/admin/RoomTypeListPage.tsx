@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { useCreateRoomType, useUpdateRoomType, useUpdateRoomStatus } from '../../hooks/mutations/useRoomTypeMutation';
 import { useAdminRoomTypes } from '../../hooks/queries/useAdminBookingsQuery';
 
-// ── Schema Validation cho Form ──
+const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
+
 const roomTypeSchema = z.object({
   typeName: z.string().min(1, 'Vui lòng nhập tên hạng phòng'),
   maxCapacity: z.number({ message: 'Vui lòng nhập số' }).min(1, 'Sức chứa tối thiểu là 1'),
@@ -15,17 +16,17 @@ const roomTypeSchema = z.object({
 
 type RoomTypeFormValues = z.infer<typeof roomTypeSchema>;
 
-// ── MOCK AMENITIES ──
 const MOCK_AMENITIES = [
-  { id: 1, amenityName: 'WiFi' },
-  { id: 2, amenityName: 'Điều hòa' },
-  { id: 3, amenityName: 'TV' },
-  { id: 4, amenityName: 'Tủ lạnh' },
+  { id: 1, amenityName: 'WiFi miễn phí' },
+  { id: 2, amenityName: 'Điều hòa nhiệt độ' },
+  { id: 3, amenityName: 'TV màn hình phẳng' },
+  { id: 4, amenityName: 'Minibar' },
   { id: 5, amenityName: 'Bồn tắm' },
   { id: 6, amenityName: 'Ban công' },
+  { id: 7, amenityName: 'Két an toàn' },
+  { id: 8, amenityName: 'Dịch vụ phòng 24/7' },
 ];
 
-// ── SKELETON CARD ──
 const SkeletonCard = () => (
   <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden animate-pulse">
     <div className="h-40 bg-gray-200" />
@@ -48,7 +49,6 @@ const SkeletonCard = () => (
   </div>
 );
 
-// ── COMPONENT MODAL FORM ──
 const RoomTypeFormModal = ({
   onClose,
   defaultValues,
@@ -56,32 +56,40 @@ const RoomTypeFormModal = ({
   onClose: () => void;
   defaultValues?: any;
 }) => {
-
-
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RoomTypeFormValues>({
     resolver: zodResolver(roomTypeSchema),
-    defaultValues: defaultValues ?? {
-      typeName: '',
-      maxCapacity: 1,
-      basePrice: 0,
-      description: '',
-    },
+    defaultValues: defaultValues
+      ? {
+          typeName: defaultValues.typeName,
+          maxCapacity: defaultValues.maxCapacity,
+          basePrice: Number(defaultValues.basePrice),
+          description: defaultValues.description ?? '',
+        }
+      : { typeName: '', maxCapacity: 1, basePrice: 0, description: '' },
   });
 
   const [selectedAmenities, setSelectedAmenities] = useState<number[]>(
     defaultValues?.amenities?.map((a: any) => a.amenity?.id ?? a.id) ?? []
   );
 
+  const [deleteImageIds, setDeleteImageIds] = useState<number[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
- const { mutate: createRoomType, isPending: isCreating } = useCreateRoomType();
+  const { mutate: createRoomType, isPending: isCreating } = useCreateRoomType();
   const { mutate: updateRoomType, isPending: isUpdating } = useUpdateRoomType();
   const isPending = isCreating || isUpdating;
+
+  const existingImages: { id: number; imageUrl: string }[] = defaultValues?.images ?? [];
+  const visibleExistingImages = existingImages.filter((img) => !deleteImageIds.includes(img.id));
+
+  const handleDeleteExistingImage = (imageId: number) => {
+    setDeleteImageIds((prev) => [...prev, imageId]);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -90,7 +98,7 @@ const RoomTypeFormModal = ({
     setPreviewUrls(newFiles.map((f) => URL.createObjectURL(f)));
   };
 
-  const handleRemoveImage = (index: number) => {
+  const handleRemoveNewImage = (index: number) => {
     const newFiles = imageFiles.filter((_, i) => i !== index);
     setImageFiles(newFiles);
     setPreviewUrls(newFiles.map((f) => URL.createObjectURL(f)));
@@ -102,7 +110,6 @@ const RoomTypeFormModal = ({
     );
   };
 
-  // ── HÀM SUBMIT XỬ LÝ DỮ LIỆU GỬI ĐI ──
   const onSubmit = (data: RoomTypeFormValues) => {
     const formData = new FormData();
 
@@ -115,18 +122,22 @@ const RoomTypeFormModal = ({
     imageFiles.forEach((file) => formData.append('images', file));
 
     if (defaultValues?.id) {
-      // Gửi version lên để backend kiểm tra conflict
-      formData.append('version', String(defaultValues.version)); 
-      updateRoomType({ id: defaultValues.id, data: formData });
+      formData.append('version', String(defaultValues.version));
+      if (deleteImageIds.length > 0) {
+        formData.append('deleteImageIds', JSON.stringify(deleteImageIds));
+      }
+      updateRoomType(
+        { id: defaultValues.id, data: formData },
+        { onSuccess: () => onClose() }
+      );
     } else {
-      createRoomType(formData);
+      createRoomType(formData, { onSuccess: () => onClose() });
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-md w-full max-w-lg flex flex-col max-h-[90vh]">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <h3 className="text-base font-medium text-gray-800">
             {defaultValues ? 'Chỉnh sửa hạng phòng' : 'Thêm hạng phòng'}
@@ -140,13 +151,11 @@ const RoomTypeFormModal = ({
           </button>
         </div>
 
-        {/* Form — scrollable */}
         <form
           id="room-type-form"
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-4 px-6 py-4 overflow-y-auto flex-1"
         >
-          {/* typeName */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-gray-500">Tên hạng phòng</label>
             <input
@@ -159,7 +168,6 @@ const RoomTypeFormModal = ({
             )}
           </div>
 
-          {/* maxCapacity + basePrice */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-gray-500">Sức chứa tối đa</label>
@@ -186,7 +194,6 @@ const RoomTypeFormModal = ({
             </div>
           </div>
 
-          {/* description */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-gray-500">Mô tả</label>
             <textarea
@@ -197,12 +204,45 @@ const RoomTypeFormModal = ({
             />
           </div>
 
-          {/* Upload ảnh */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs text-gray-500">
-              Ảnh phòng ({imageFiles.length}/10)
-            </label>
+          {defaultValues && existingImages.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-gray-500">
+                Ảnh hiện tại ({visibleExistingImages.length}/{existingImages.length})
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {visibleExistingImages.map((img) => (
+                  <div key={img.id} className="relative group">
+                    <img
+                      src={img.imageUrl}
+                      alt=""
+                      className="w-16 h-16 object-cover rounded-xl border border-gray-100"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteExistingImage(img.id)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                      title="Đánh dấu xóa ảnh này"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {deleteImageIds.length > 0 && (
+                <p className="text-xs text-orange-500">
+                  {deleteImageIds.length} ảnh sẽ bị xóa khi lưu
+                </p>
+              )}
+            </div>
+          )}
 
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-gray-500">
+              {defaultValues ? 'Thêm ảnh mới' : 'Ảnh phòng'} ({imageFiles.length}/10)
+            </label>
             <label className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-5 flex flex-col items-center gap-1.5 cursor-pointer hover:border-primary/50 transition-colors">
               <span className="text-sm text-gray-400">Nhấn để chọn ảnh</span>
               <span className="text-xs text-gray-300">
@@ -217,7 +257,6 @@ const RoomTypeFormModal = ({
               />
             </label>
 
-            {/* Preview thumbnails */}
             {previewUrls.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-1">
                 {previewUrls.map((url, idx) => (
@@ -229,8 +268,8 @@ const RoomTypeFormModal = ({
                     />
                     <button
                       type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRemoveNewImage(idx)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                     >
                       ✕
                     </button>
@@ -240,7 +279,6 @@ const RoomTypeFormModal = ({
             )}
           </div>
 
-          {/* Amenities */}
           <div className="flex flex-col gap-2">
             <label className="text-xs text-gray-500">Tiện nghi</label>
             <div className="grid grid-cols-2 gap-2">
@@ -262,7 +300,6 @@ const RoomTypeFormModal = ({
           </div>
         </form>
 
-        {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button
             type="button"
@@ -286,18 +323,12 @@ const RoomTypeFormModal = ({
   );
 };
 
-// ── COMPONENT CHÍNH ──
 const RoomTypeListPage = () => {
- 
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
-  
-  // State quản lý việc mở rộng danh sách phòng
   const [expandedRoomTypeId, setExpandedRoomTypeId] = useState<number | null>(null);
 
-  // Hook gọi API lấy danh sách hạng phòng
   const { data: roomTypes, isLoading } = useAdminRoomTypes();
-
   const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateRoomStatus();
 
   const toggleExpand = (id: number) => {
@@ -306,7 +337,6 @@ const RoomTypeListPage = () => {
 
   return (
     <div className="flex flex-col gap-6 relative">
-      {/* ── Heading ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-800">Quản lý hạng phòng</h2>
         <button
@@ -320,7 +350,6 @@ const RoomTypeListPage = () => {
         </button>
       </div>
 
-      {/* ── TRẠNG THÁI LOADING (SKELETON) ── */}
       {isLoading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SkeletonCard />
@@ -329,7 +358,6 @@ const RoomTypeListPage = () => {
         </div>
       )}
 
-      {/* ── TRẠNG THÁI TRỐNG ── */}
       {!isLoading && (!roomTypes || roomTypes.length === 0) && (
         <div className="flex flex-col items-center justify-center py-20 gap-2">
           <p className="text-gray-800 font-medium text-sm">Chưa có hạng phòng nào</p>
@@ -337,7 +365,6 @@ const RoomTypeListPage = () => {
         </div>
       )}
 
-      {/* ── GRID HIỂN THỊ DỮ LIỆU ── */}
       {!isLoading && roomTypes && roomTypes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {roomTypes.map((rt: any) => {
@@ -352,20 +379,23 @@ const RoomTypeListPage = () => {
                 onClick={() => toggleExpand(rt.id)}
                 className={`bg-white border ${isExpanded ? 'border-primary ring-1 ring-primary/20' : 'border-gray-100'} rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all cursor-pointer`}
               >
-                {/* Ảnh */}
                 {image ? (
                   <img
                     src={image}
                     alt={rt.typeName}
                     className="w-full h-40 object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+                    }}
                   />
                 ) : (
-                  <div className="w-full h-40 bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
-                    <span className="text-white/50 text-sm">Chưa có ảnh</span>
-                  </div>
+                  <img
+                    src={PLACEHOLDER}
+                    alt={rt.typeName}
+                    className="w-full h-40 object-cover"
+                  />
                 )}
 
-                {/* Nội dung */}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div>
                     <h3 className="text-sm font-medium text-gray-800">{rt.typeName}</h3>
@@ -377,7 +407,6 @@ const RoomTypeListPage = () => {
                     <span className="text-gray-400 font-normal"> / đêm</span>
                   </p>
 
-                  {/* Tiện nghi */}
                   {visibleAmenities.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {visibleAmenities.map((a: any) => (
@@ -393,7 +422,6 @@ const RoomTypeListPage = () => {
                     </div>
                   )}
 
-                  {/* Footer Card */}
                   <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                     <span className="text-xs text-gray-400">
                       {rt._count?.rooms ?? rt.rooms?.length ?? 0} phòng
@@ -419,11 +447,10 @@ const RoomTypeListPage = () => {
                   </div>
                 </div>
 
-                {/* ── BẢNG DANH SÁCH PHÒNG (MỞ RỘNG) ── */}
                 {isExpanded && (
                   <div 
                     className="border-t border-gray-100 bg-gray-50/50 p-4 cursor-default"
-                    onClick={(e) => e.stopPropagation()} // Ngăn click vào bảng làm đóng card
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <h4 className="text-sm font-medium text-gray-800 mb-3">
                       Danh sách phòng ({rt.rooms?.length || 0})
@@ -482,7 +509,6 @@ const RoomTypeListPage = () => {
         </div>
       )}
 
-      {/* ── RENDER MODAL ── */}
       {showModal && (
         <RoomTypeFormModal
           onClose={() => {

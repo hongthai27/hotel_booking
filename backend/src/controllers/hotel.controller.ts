@@ -31,18 +31,32 @@ export const createRoomType = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const updateRoomType = catchAsync(async (req: Request, res: Response) => {
-  const { version, ...data } = req.body;
-  
+  const { version, deleteImageIds, amenityIds, ...data } = req.body;
+
   if (version === undefined) {
     throw new AppError(400, 'Thiếu thông tin version để kiểm tra xung đột');
   }
-  
+
+  const parsedDeleteImageIds: number[] = typeof deleteImageIds === 'string'
+    ? JSON.parse(deleteImageIds)
+    : (Array.isArray(deleteImageIds) ? deleteImageIds.map(Number) : []);
+
+  const parsedAmenityIds: number[] = typeof amenityIds === 'string'
+    ? JSON.parse(amenityIds)
+    : (Array.isArray(amenityIds) ? amenityIds.map(Number) : []);
+
   const updated = await hotelService.updateRoomType(
     Number(req.params.id),
-    { ...data, version: Number(version) }, // <-- Ép kiểu Number ở đây
+    {
+      ...data,
+      version: Number(version),
+      deleteImageIds: parsedDeleteImageIds,
+      amenityIds: parsedAmenityIds,
+    },
+    (req.files as Express.Multer.File[]) || [],
     req.user!.userId
   );
-  
+
   successResponse(res, updated, 'Cập nhật hạng phòng thành công');
 });
 

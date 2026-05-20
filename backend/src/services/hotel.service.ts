@@ -2,7 +2,7 @@ import { Prisma, RoomStatus, BookingStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
 import { createAuditLog } from '../utils/audit-log.util';
-import { uploadImage } from '../utils/cloudinary.util';
+import { uploadImage, deleteCloudinaryImage } from '../utils/cloudinary.util';
 import { RoomTypeDto, RoomDto, AmenityDto, SearchAvailableDto } from '../validations/hotel.schema';
 
 interface RoomFilter {
@@ -97,31 +97,76 @@ export const createRoomType = async (data: RoomTypeDto, actorId: number) => {
 
 export const updateRoomType = async (
   id: number,
-  data: RoomTypeDto & { version: number },
+  data: RoomTypeDto & {
+    version: number;
+    deleteImageIds?: number[];
+    amenityIds?: number[];
+  },
+  files: Express.Multer.File[],
   actorId: number
 ) => {
-  const existing = await prisma.roomType.findUnique({
+  const old = await prisma.roomType.findUnique({
     where: { id },
+    include: { images: true },
   });
 
-  if (!existing) {
-    throw new AppError(404, 'Không tìm thấy loại phòng');
+  if (!old) {
+    throw new AppError(404, 'Không tìm thấy hạng phòng');
   }
 
-  // Optimistic locking — kiểm tra version trước khi update
-  if (existing.version !== data.version) {
+  if (old.version !== data.version) {
     throw new AppError(
       409,
       'Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang và thử lại.'
     );
   }
 
-  const imageUrls = data.images && data.images.length > 0
-    ? await Promise.all(data.images.map((image) => uploadImage(image)))
-    : [];
+  let newImageUrls: string[] = [];
+  if (files && files.length > 0) {
+    newImageUrls = await Promise.all(
+      files.map((file) => uploadImage(file.path))
+    );
+  }
 
   return prisma.$transaction(async (tx) => {
-    // Dùng where.version để đảm bảo atomic — nếu version đã thay đổi trước khi update thì Prisma ném lỗi
+    if (data.deleteImageIds && data.deleteImageIds.length > 0) {
+      const imagesToDelete = old.images.filter((img) =>
+        data.deleteImageIds!.includes(img.id)
+      );
+
+      imagesToDelete.forEach((img) => {
+        deleteCloudinaryImage(img.imageUrl);
+      });
+
+      await tx.roomImage.deleteMany({
+        where: {
+          id: { in: data.deleteImageIds },
+          roomTypeId: id,
+        },
+      });
+    }
+
+    if (newImageUrls.length > 0) {
+      const remainingImages = await tx.roomImage.findMany({
+        where: { roomTypeId: id },
+        orderBy: { displayOrder: 'desc' },
+        take: 1,
+      });
+
+      const startOrder =
+        remainingImages.length > 0
+          ? remainingImages[0].displayOrder + 1
+          : 0;
+
+      await tx.roomImage.createMany({
+        data: newImageUrls.map((url, index) => ({
+          roomTypeId: id,
+          imageUrl: url,
+          displayOrder: startOrder + index,
+        })),
+      });
+    }
+
     const updated = await tx.roomType.update({
       where: {
         id,
@@ -130,31 +175,31 @@ export const updateRoomType = async (
       data: {
         ...(data.typeName && { typeName: data.typeName }),
         ...(data.description !== undefined && { description: data.description }),
-        ...(data.maxCapacity && { maxCapacity: data.maxCapacity }),
         ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
-        amenities: {
-          deleteMany: {},
-          create: data.amenityIds.map((amenityId) => ({ amenityId })),
-        },
-        ...(imageUrls.length > 0 && {
-          images: {
-            deleteMany: {},
-            create: imageUrls.map((url, index) => ({
-              imageUrl: url,
-              displayOrder: index,
-            })),
-          },
-        }),
-        // Auto increment version sau mỗi lần update thành công
+        ...(data.maxCapacity && { maxCapacity: data.maxCapacity }),
         version: { increment: 1 },
       },
     }).catch(() => {
-      // Nếu update thất bại do version conflict
       throw new AppError(
         409,
         'Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang và thử lại.'
       );
     });
+
+    if (data.amenityIds !== undefined) {
+      await tx.roomTypeAmenity.deleteMany({
+        where: { roomTypeId: id },
+      });
+
+      if (data.amenityIds.length > 0) {
+        await tx.roomTypeAmenity.createMany({
+          data: data.amenityIds.map((amenityId: number) => ({
+            roomTypeId: id,
+            amenityId,
+          })),
+        });
+      }
+    }
 
     await createAuditLog({
       tx,
@@ -162,11 +207,36 @@ export const updateRoomType = async (
       targetTable: 'RoomType',
       targetId: id,
       action: 'UPDATE',
-      oldValue: { ...existing, version: existing.version },
-      newValue: { ...updated, version: updated.version },
+      oldValue: {
+        typeName: old.typeName,
+        description: old.description,
+        basePrice: old.basePrice,
+        maxCapacity: old.maxCapacity,
+        version: old.version,
+        imageCount: old.images.length,
+      },
+      newValue: {
+        typeName: updated.typeName,
+        description: updated.description,
+        basePrice: updated.basePrice,
+        maxCapacity: updated.maxCapacity,
+        version: updated.version,
+        deletedImageIds: data.deleteImageIds ?? [],
+        newImagesUploaded: newImageUrls.length,
+      },
     });
 
-    return updated;
+    return tx.roomType.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { displayOrder: 'asc' } },
+        amenities: {
+          include: {
+            amenity: true,
+          },
+        },
+      },
+    });
   });
 };
 
@@ -175,6 +245,7 @@ export const deleteRoomType = async (id: number, actorId: number) => {
     where: { id },
     include: {
       _count: { select: { rooms: true } },
+      images: true,
     },
   });
 
@@ -184,6 +255,10 @@ export const deleteRoomType = async (id: number, actorId: number) => {
 
   if (existing._count.rooms > 0) {
     throw new AppError(400, 'Không thể xóa loại phòng đang có phòng sử dụng');
+  }
+
+  if (existing.images.length > 0) {
+      Promise.allSettled(existing.images.map((img) => deleteCloudinaryImage(img.imageUrl)));
   }
 
   return prisma.$transaction(async (tx) => {

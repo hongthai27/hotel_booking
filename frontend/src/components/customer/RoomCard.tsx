@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useSearchStore } from '../../stores/searchStore';
 
+const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
+
 interface RoomCardProps {
   id: string;
   name: string;
-  image: string;
+  image?: string;
   price: number;
   maxCapacity?: number;
   availableRooms?: number;
@@ -29,8 +31,15 @@ const RoomCard = ({ id, name, image, price, maxCapacity, availableRooms }: RoomC
       className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col h-full"
       onClick={handleCardClick} 
     >
-      <div className="h-52 w-full">
-        <img src={image} alt={name} className="w-full h-full object-cover" />
+      <div className="h-52 w-full bg-gray-100">
+        <img 
+          src={image || PLACEHOLDER} 
+          alt={name} 
+          className="w-full h-full object-cover" 
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+          }}
+        />
       </div>
       <div className="p-5 flex flex-col flex-1">
         
