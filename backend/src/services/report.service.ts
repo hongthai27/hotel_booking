@@ -100,7 +100,6 @@ export const getRefundList = async () => {
   return prisma.payment.findMany({
     where: {
       feeType: 'refund',
-      status: 'refunded',
     },
     include: {
       booking: {
@@ -122,6 +121,6 @@ export const getRefundList = async () => {
         },
       },
     },
-    orderBy: { refundedAt: 'desc' },
+    orderBy: { createdAt: 'desc' },
   });
 };

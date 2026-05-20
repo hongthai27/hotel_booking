@@ -32,20 +32,20 @@ const BookingCard = ({
 
   const renderBadges = () => {
     if (booking.status === 'cancelled') {
-      const isRefunded = booking.payments?.some((p) => p.feeType === 'refund' && p.status === 'refunded');
-      if (isRefunded) {
+      const refundPayment = booking.payments?.find((p) => p.feeType === 'refund');
+
+      if (refundPayment?.status === 'refunded') {
         return (
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-            Đã hoàn tiền
+            Đã hoàn tiền ({formatVND(Number(refundPayment.amount))})
           </span>
         );
       }
 
-      const isPendingRefund = booking.payments?.some((p) => p.feeType === 'refund' && p.status === 'pending');
-      if (isPendingRefund) {
+      if (refundPayment?.status === 'pending_refund') {
         return (
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
-            Chờ hoàn tiền
+            Chờ hoàn tiền ({formatVND(Number(refundPayment.amount))})
           </span>
         );
       }

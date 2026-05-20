@@ -11,4 +11,6 @@ router.get(
   adminController.searchUsers
 );
 
+router.get('/refunds', adminController.getAllRefunds);
+
 export default router;

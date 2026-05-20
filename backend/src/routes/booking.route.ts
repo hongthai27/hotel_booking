@@ -126,7 +126,7 @@ router.get(
 );
 
 router.patch(
-  '/admin/bookings/:id/confirm-refund',
+  '/admin/payments/:id/confirm-refund',
   authenticateJWT,
   authorizeRole(['admin', 'receptionist']),
   bookingController.confirmRefund

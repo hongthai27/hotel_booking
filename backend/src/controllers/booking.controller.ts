@@ -4,6 +4,7 @@ import { successResponse } from '../utils/response.util';
 import { catchAsync } from '../utils/catch-async.util';
 import { BookingStatus, BookingSource } from '@prisma/client';
 import { emitBookingUpdate } from '../utils/socket.util';
+import * as paymentService from '../services/payment.service';
 
 export const createBooking = catchAsync(async (req: Request, res: Response) => {
   const booking = await bookingService.createBooking(req.body, req.user!.userId);
@@ -137,6 +138,15 @@ export const getReviewsByRoomType = catchAsync(async (req: Request, res: Respons
 });
 
 export const confirmRefund = catchAsync(async (req: Request, res: Response) => {
-  const result = await bookingService.confirmRefund(Number(req.params.id), req.user!.userId);
+
+  const result = await paymentService.confirmRefund(Number(req.params.id), req.user!.userId);
+  
+  if (result && result.bookingId) {
+    emitBookingUpdate(result.bookingId, { 
+      status: 'cancelled', // Booking vẫn ở trạng thái huỷ
+      paymentStatus: 'refunded' // Báo cho frontend biết tiền đã hoàn
+    });
+  }
+
   successResponse(res, result, 'Xác nhận hoàn tiền thành công');
 });

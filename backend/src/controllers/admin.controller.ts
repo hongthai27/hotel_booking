@@ -26,3 +26,26 @@ export const searchUsers = catchAsync(async (req: Request, res: Response) => {
 
   successResponse(res, users, 'Tìm kiếm khách hàng thành công');
 });
+
+export const getAllRefunds = catchAsync(async (req: Request, res: Response) => {
+  const refunds = await prisma.payment.findMany({
+    where: {
+      feeType: 'refund', 
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      booking: {
+        include: {
+          customer: {
+            select: { fullName: true, phoneNumber: true },
+          },
+          room: {
+            include: { roomType: true },
+          },
+        },
+      },
+    },
+  });
+
+  successResponse(res, refunds, 'Lấy danh sách hoàn tiền thành công');
+});

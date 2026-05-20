@@ -166,3 +166,32 @@ export const simulateSuccess = async (transactionRef: string) => {
     status: 'success',
   };
 };
+
+export const confirmRefund = async (paymentId: number, actorId: number) => {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+  });
+
+  if (!payment || payment.status !== 'pending_refund') {
+    throw new AppError(400, 'Giao dịch không tồn tại hoặc không ở trạng thái chờ hoàn tiền');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.payment.update({
+      where: { id: paymentId },
+      data: { status: 'refunded', refundedAt: new Date() },
+    });
+
+    await createAuditLog({
+      tx,
+      actorId,
+      targetTable: 'Payment',
+      targetId: paymentId,
+      action: 'UPDATE',
+      oldValue: { status: 'pending_refund' },
+      newValue: { status: 'refunded' },
+    });
+
+    return updated;
+  });
+};

@@ -354,7 +354,10 @@ export const cancelBooking = async (
     if (successPayment) {
       const penaltyAmount = Number(booking.totalAmount) - refundAmount;
 
-      // KHÔNG CẬP NHẬT TRẠNG THÁI GIAO DỊCH GỐC - Giữ nguyên success làm lịch sử dòng tiền
+      await tx.payment.update({
+        where: { id: successPayment.id },
+        data: { status: refundAmount > 0 ? 'pending_refund' : 'success' },
+      });
 
       // Tạo bản ghi cho phần tiền trả lại khách (Trạng thái PENDING - Chờ duyệt hoàn tiền)
       if (refundAmount > 0) {
@@ -420,49 +423,6 @@ export const cancelBooking = async (
 
   return { refundAmount };
 };
-
-// ================= HÀM MỚI CHO ADMIN XÁC NHẬN HOÀN TIỀN =================
-export const confirmRefund = async (bookingId: number, staffId: number) => {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    include: { payments: true }
-  });
-
-  if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
-
-  // Tìm giao dịch hoàn tiền đang ở trạng thái pending
-  const pendingRefund = booking.payments.find(p => p.feeType === 'refund' && p.status === 'pending_refund');
-  
-  if (!pendingRefund) {
-    throw new AppError(400, 'Không tìm thấy yêu cầu hoàn tiền nào đang chờ xử lý cho đơn này');
-  }
-
-  await prisma.$transaction(async (tx) => {
-    // Cập nhật trạng thái hoàn tiền thành công
-    await tx.payment.update({
-      where: { id: pendingRefund.id },
-      data: {
-        status: 'refunded',
-        refundedAt: new Date()
-      }
-    });
-
-    await createAuditLog({
-      tx,
-      actorId: staffId,
-      targetTable: 'Payment',
-      targetId: pendingRefund.id,
-      action: 'UPDATE',
-      oldValue: { status: 'pending_refund' },
-      newValue: { status: 'refunded' }
-    });
-  });
-
-  emitBookingUpdate(bookingId, { status: 'cancelled' }); 
-
-  return { message: 'Xác nhận hoàn tiền thành công' };
-};
-// ======================================================================
 
 export const checkIn = async (bookingId: number, staffId: number) => {
   const booking = await prisma.booking.findUnique({
