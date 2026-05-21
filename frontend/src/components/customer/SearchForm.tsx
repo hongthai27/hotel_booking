@@ -64,7 +64,18 @@ const buildSearchSchema = (today: string) =>
 
 type SearchFormValues = z.infer<ReturnType<typeof buildSearchSchema>>;
 
-const SearchForm = () => {
+// --- BỔ SUNG: Interface cho Props ---
+interface SearchFormProps {
+  compact?: boolean;
+}
+
+// --- BỔ SUNG: Helper class cho input ---
+const inputClass = (compact: boolean) =>
+  `border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors w-full ${
+    compact ? 'text-xs' : 'text-sm'
+  }`;
+
+const SearchForm = ({ compact = false }: SearchFormProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const today = getToday();
@@ -131,6 +142,70 @@ const SearchForm = () => {
     navigate(`/rooms?${params.toString()}`);
   };
 
+  // --- BỔ SUNG: Render giao diện Compact ---
+  if (compact) {
+    return (
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex flex-wrap gap-2 items-end"
+      >
+        <div className="flex flex-col gap-1 w-32">
+          <label className="text-xs text-gray-400">Nhận phòng</label>
+          <Controller
+            control={control}
+            name="checkIn"
+            render={({ field }) => (
+              <DatePicker
+                selected={field.value ? new Date(field.value) : null}
+                onChange={(date) => field.onChange(toLocalDateString(date))}
+                dateFormat="dd/MM/yyyy"
+                minDate={new Date(today)}
+                placeholderText="dd/mm/yyyy"
+                className={inputClass(true)}
+                wrapperClassName="w-full"
+              />
+            )}
+          />
+        </div>
+        <div className="flex flex-col gap-1 w-32">
+          <label className="text-xs text-gray-400">Trả phòng</label>
+          <Controller
+            control={control}
+            name="checkOut"
+            render={({ field }) => (
+              <DatePicker
+                selected={field.value ? new Date(field.value) : null}
+                onChange={(date) => field.onChange(toLocalDateString(date))}
+                dateFormat="dd/MM/yyyy"
+                minDate={new Date(minCheckOut)}
+                placeholderText="dd/mm/yyyy"
+                className={inputClass(true)}
+                wrapperClassName="w-full"
+              />
+            )}
+          />
+        </div>
+        <div className="flex flex-col gap-1 w-20">
+          <label className="text-xs text-gray-400">Số khách</label>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            className={inputClass(true)}
+            {...register('guests', { valueAsNumber: true })}
+          />
+        </div>
+        <button
+          type="submit"
+          className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-xs font-medium rounded-xl transition-colors whitespace-nowrap"
+        >
+          Cập nhật
+        </button>
+      </form>
+    );
+  }
+
+  // --- GIỮ NGUYÊN: Render giao diện đầy đủ mặc định ---
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
@@ -149,7 +224,7 @@ const SearchForm = () => {
               dateFormat="dd/MM/yyyy"
               minDate={new Date(today)}
               placeholderText="dd/mm/yyyy"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              className={inputClass(false)}
               wrapperClassName="w-full"
             />
           )}
@@ -170,7 +245,7 @@ const SearchForm = () => {
               dateFormat="dd/MM/yyyy"
               minDate={new Date(minCheckOut)}
               placeholderText="dd/mm/yyyy"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              className={inputClass(false)}
               wrapperClassName="w-full"
             />
           )}
@@ -185,7 +260,7 @@ const SearchForm = () => {
           type="number"
           min={1}
           max={10}
-          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+          className={inputClass(false)}
           {...register('guests', { valueAsNumber: true })}
         />
         {errors.guests && <p className="text-red-500 text-xs mt-1">{errors.guests.message}</p>}
@@ -204,7 +279,7 @@ const SearchForm = () => {
                 placeholder="Min"
                 value={formatCurrency(value)}
                 onChange={(e) => onChange(parseCurrency(e.target.value))}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-gray-300"
+                className={`${inputClass(false)} placeholder:text-gray-300`}
               />
             )}
           />
@@ -220,10 +295,10 @@ const SearchForm = () => {
                 placeholder="Max"
                 value={formatCurrency(value)}
                 onChange={(e) => onChange(parseCurrency(e.target.value))}
-                className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none transition-colors placeholder:text-gray-300 ${
+                className={`${inputClass(false)} placeholder:text-gray-300 ${
                   errors.maxPrice 
                     ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
-                    : 'border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary text-gray-800'
+                    : ''
                 }`}
               />
             )}
