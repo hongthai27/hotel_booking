@@ -42,6 +42,7 @@ export interface Booking {
   cancelReason?: string;
   createdAt: string;
   updatedAt: string;
+  review?: Review | null;
   room?: {
     id: number;
     roomNumber: string;

@@ -13,6 +13,11 @@ export const getAllRoomTypes = catchAsync(async (req: Request, res: Response) =>
   successResponse(res, roomTypes, 'Lấy danh sách loại phòng thành công');
 });
 
+export const getAllRoomTypesPublic = catchAsync(async (_req: Request, res: Response) => {
+  const data = await hotelService.getAllRoomTypesPublic();
+  successResponse(res, data, 'Lay danh sach hang phong thanh cong');
+});
+
 export const getRoomTypeById = catchAsync(async (req: Request, res: Response) => {
   const id = Number(req.params.roomTypeId);
 
@@ -105,7 +110,7 @@ export const updateRoomStatus = catchAsync(async (req: Request, res: Response) =
   const updated = await hotelService.updateRoomStatus(
     Number(req.params.id),
     status,
-    Number(version), // <-- Ép kiểu Number ở đây
+    Number(version),
     req.user!.userId
   );
   
@@ -115,7 +120,6 @@ export const updateRoomStatus = catchAsync(async (req: Request, res: Response) =
 // ── Search ─────────────────────────────────────────────────────────────────────
 
 export const searchAvailable = catchAsync(async (req: Request, res: Response) => {
-  // validateQuery đã chạy trước ở route, req.query đã được coerce đúng kiểu
   const results = await hotelService.searchAvailable(
     req.query as unknown as SearchAvailableDto
   );
@@ -147,13 +151,7 @@ export const deleteAmenity = catchAsync(async (req: Request, res: Response) => {
 
 // ── Dashboard / Sơ đồ phòng ────────────────────────────────────────────────────
 
-/**
- * Lấy danh sách sơ đồ phòng tổng quan kèm khách đang lưu trú
- * Phục vụ cho giao diện Dashboard Realtime của Lễ tân/Admin
- */
 export const getRoomOverview = catchAsync(async (req: Request, res: Response) => {
   const rooms = await hotelService.getRoomOverview();
-  
-  // Trả về response chuẩn hóa qua helper successResponse
   successResponse(res, rooms, 'Lấy sơ đồ phòng tổng quan thành công');
 });

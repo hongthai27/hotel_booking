@@ -677,3 +677,18 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
     throw new AppError(500, `Lỗi khi lấy sơ đồ phòng: ${error.message}`);
   }
 };
+
+export const getAllRoomTypesPublic = async () => {
+  return prisma.roomType.findMany({
+    include: {
+      images: {
+        orderBy: { displayOrder: 'asc' },
+      },
+      amenities: {
+        include: {
+          amenity: true,
+        },
+      },
+    },
+  });
+};

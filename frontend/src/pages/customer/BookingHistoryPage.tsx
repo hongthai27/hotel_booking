@@ -7,6 +7,7 @@ import type { Booking, BookingStatus } from '../../types/booking.types';
 import { formatVND, formatDate, calcNights } from '../../utils/format';
 import BookingStatusBadge from '../../components/common/BookingStatusBadge';
 import CancelBookingModal from '../../components/customer/CancelBookingModal';
+import ReviewForm from '../../components/customer/ReviewForm';
 
 const TABS: { label: string; value: BookingStatus | undefined }[] = [
   { label: 'Tất cả', value: undefined },
@@ -28,6 +29,7 @@ const BookingCard = ({
   setCancelTarget: (id: number | null) => void;
 }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const nights = calcNights(booking.checkInDate, booking.checkOutDate);
   const image = booking.room?.roomType?.images?.[0]?.imageUrl;
@@ -131,6 +133,37 @@ const BookingCard = ({
             </button>
           )}
         </div>
+
+        {booking.status === 'checked_out' && !booking.review && (
+          <div 
+            className="mt-1 pt-3 border-t border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ReviewForm
+              bookingId={booking.id}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
+              }}
+            />
+          </div>
+        )}
+
+        {booking.status === 'checked_out' && booking.review && (
+          <div className="mt-1 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <div className="flex text-amber-400 text-sm">
+                {'★'.repeat(booking.review.rating)}
+                {'☆'.repeat(5 - booking.review.rating)}
+              </div>
+              <span className="text-xs text-gray-400">Bạn đã đánh giá</span>
+            </div>
+            {booking.review.comment && (
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                "{booking.review.comment}"
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -200,7 +233,7 @@ const BookingHistoryPage = () => {
 
       {!isLoading && !isError && bookings && bookings.length > 0 && (
         <div className="flex flex-col gap-4">
-          {bookings.map((booking) => (
+          {bookings.map((booking: any) => (
             <BookingCard
               key={booking.id}
               booking={booking}

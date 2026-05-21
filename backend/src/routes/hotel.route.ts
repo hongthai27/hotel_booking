@@ -38,6 +38,9 @@ router.get(
   hotelController.searchAvailable
 );
 
+// Dat truoc cac route co params de tranh conflict
+router.get('/hotels/room-types', hotelController.getAllRoomTypesPublic);
+
 router.get('/hotels/:roomTypeId', hotelController.getRoomTypeById);
 
 router.get('/hotels', hotelController.getAllRoomTypes);

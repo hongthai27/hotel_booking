@@ -19,4 +19,8 @@ export const hotelService = {
       .get<{ data: RoomType[] }>('/hotels')
       .then((r) => r.data.data),
       
+  getAllRoomTypes: (): Promise<RoomType[]> =>
+    api
+      .get<{ data: RoomType[] }>('/hotels/room-types')
+      .then((r) => r.data.data),
 };

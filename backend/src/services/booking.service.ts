@@ -94,7 +94,6 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
   });
 };
 
-
 interface GetMyBookingsFilter {
   status?: BookingStatus;
 }
@@ -130,6 +129,7 @@ export const getMyBookings = async (
           amount: true,
         },
       },
+      review: true,
     },
   });
 };
@@ -148,6 +148,7 @@ export const getBookingById = async (
         }
       },
       payments: true,
+      review: true,
       customer: {
         select: {
           id: true,
@@ -163,16 +164,15 @@ export const getBookingById = async (
     throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
   }
 
-  // Customer chỉ được xem booking của chính mình
   if (requesterRole === 'customer' && booking.userId !== requesterId) {
     throw new AppError(403, 'Bạn không có quyền xem đơn đặt phòng này');
   }
 
-const checkIn = new Date(booking.checkInDate);
-const checkOut = new Date(booking.checkOutDate);
-const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  const checkIn = new Date(booking.checkInDate);
+  const checkOut = new Date(booking.checkOutDate);
+  const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
-const lastPayment = booking.payments[0] || null;
+  const lastPayment = booking.payments[0] || null;
 
   return {
     ...booking,
@@ -359,7 +359,6 @@ export const cancelBooking = async (
         data: { status: refundAmount > 0 ? 'pending_refund' : 'success' },
       });
 
-      // Tạo bản ghi cho phần tiền trả lại khách (Trạng thái PENDING - Chờ duyệt hoàn tiền)
       if (refundAmount > 0) {
         await tx.payment.create({
           data: {
@@ -373,7 +372,6 @@ export const cancelBooking = async (
         });
       }
 
-      // Tạo bản ghi cho phần tiền phạt khách sạn thu được
       if (penaltyAmount > 0) {
         await tx.payment.create({
           data: {
@@ -890,4 +888,19 @@ export const getRefundPreview = async (bookingId: number, userId: number) => {
     checkInDate: booking.checkInDate,
     checkOutDate: booking.checkOutDate,
   };
+};
+
+export const getAllRoomTypesPublic = async () => {
+  return prisma.roomType.findMany({
+    include: {
+      amenities: {
+        include: { amenity: true },
+      },
+      images: {
+        take: 1,
+        orderBy: { displayOrder: 'asc' },
+      },
+    },
+    orderBy: { basePrice: 'asc' },
+  });
 };
