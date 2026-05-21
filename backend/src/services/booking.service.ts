@@ -402,21 +402,24 @@ export const cancelBooking = async (
     status: 'cancelled',
   });
   
-  if (booking.customer) {
-    sendCancellationEmail(
-      {
-        id: booking.id,
-        checkInDate: booking.checkInDate,
-        checkOutDate: booking.checkOutDate,
-        totalAmount: Number(booking.totalAmount),
-        roomId: booking.roomId,
+  const fullBooking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      customer: true,
+      room: {
+        include: {
+          roomType: {
+            include: {
+              images: { take: 1, orderBy: { displayOrder: 'asc' } },
+            },
+          },
+        },
       },
-      {
-        fullName: booking.customer.fullName,
-        email: booking.customer.email,
-      },
-      refundAmount > 0 ? refundAmount : undefined
-    );
+    },
+  });
+
+  if (fullBooking?.customer) {
+    sendCancellationEmail(fullBooking as any, fullBooking.customer, refundAmount);
   }
 
   return { refundAmount };
