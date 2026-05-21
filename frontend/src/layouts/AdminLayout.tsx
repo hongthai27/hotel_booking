@@ -172,6 +172,12 @@ const AdminLayout = () => {
             
             <span className="text-sm font-medium text-gray-800 hidden sm:inline-block">
               {user?.fullName}
+              <Link
+                to="/profile"
+                className="ml-2 text-xs text-gray-400 hover:text-primary transition-colors"
+              >
+                Sửa hồ sơ
+              </Link>
             </span>
             <button
               onClick={handleLogout}

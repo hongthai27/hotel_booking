@@ -5,6 +5,8 @@ import CustomerLayout from '../layouts/CustomerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 
+const S = Suspense;
+
 const HomePage = lazy(() => import('../pages/customer/HomePage'));
 const LoginPage = lazy(() => import('../pages/customer/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/customer/RegisterPage'));
@@ -17,6 +19,7 @@ const AboutPage = lazy(() => import('../pages/customer/AboutPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/customer/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/customer/ResetPasswordPage'));
 const CustomerBookingDetailPage = lazy(() => import('../pages/customer/CustomerBookingDetailPage'));
+const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 
 const DashboardPage = lazy(() => import('../pages/admin/DashboardPage'));
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
@@ -83,6 +86,7 @@ const router = createBrowserRouter([
       { path: 'booking/:id', element: <BookingPage /> },
       { path: 'payment/:id', element: <PaymentPage /> },
       { path: 'my-bookings', element: <MyBookingsPage /> },
+      { path: 'profile', element: <S><ProfilePage /></S> },
       {
         path: 'bookings/:id',
         element: (

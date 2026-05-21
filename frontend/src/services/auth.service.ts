@@ -15,4 +15,23 @@ export const authService = {
     const response = await api.get<{ data: User }>('/auth/me');
     return response.data.data;
   },
+
+  updateProfile: (data: { fullName?: string; phoneNumber?: string }): Promise<User> =>
+    api.put<{ data: User }>('/auth/profile', data).then((r) => r.data.data),
+
+  uploadAvatar: (file: File): Promise<User> => {
+    const form = new FormData();
+    form.append('avatar', file);
+    return api
+      .post<{ data: User }>('/auth/profile/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data.data);
+  },
+
+  changePassword: (data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> =>
+    api.put('/auth/profile/password', data).then(() => undefined),
 };

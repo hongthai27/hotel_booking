@@ -184,7 +184,10 @@ model Booking {
   cancelReason String?       @map("cancel_reason") @db.VarChar(255)
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
-
+  idNumber     String?  @map("id_number")     @db.VarChar(20)
+  checkinNote  String?  @map("checkin_note")   @db.VarChar(500)
+  extraCharges Json?    @map("extra_charges")
+  extraTotal   Decimal  @default(0) @map("extra_total") @db.Decimal(12, 2)
   // relations
   customer       User     @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
   createdByStaff User?    @relation("BookingCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)

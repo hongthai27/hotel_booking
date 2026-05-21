@@ -53,8 +53,19 @@ const CustomerLayout = () => {
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 bg-transparent border-none cursor-pointer text-white"
               >
-                <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center font-medium text-white text-sm">
-                  {user.fullName.charAt(0).toUpperCase()}
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-accent flex items-center justify-center font-medium text-white text-sm">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.fullName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    user.fullName.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <span className="text-sm font-medium">{user.fullName}</span>
               </button>
@@ -67,6 +78,13 @@ const CustomerLayout = () => {
                     className="block px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 no-underline"
                   >
                     Lịch sử đặt phòng
+                  </NavLink>
+                  <NavLink
+                    to="/profile"
+                    onClick={() => setDropdownOpen(false)}
+                    className="block px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 no-underline"
+                  >
+                    Hồ sơ cá nhân
                   </NavLink>
                   <hr className="border-gray-100 m-0" />
                   <button
