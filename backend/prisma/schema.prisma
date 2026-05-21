@@ -188,6 +188,8 @@ model Booking {
   checkinNote  String?  @map("checkin_note")   @db.VarChar(500)
   extraCharges Json?    @map("extra_charges")
   extraTotal   Decimal  @default(0) @map("extra_total") @db.Decimal(12, 2)
+  specialRequests String? @map("special_requests") @db.VarChar(500)
+  
   // relations
   customer       User     @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
   createdByStaff User?    @relation("BookingCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)

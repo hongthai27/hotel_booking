@@ -38,6 +38,7 @@ export interface Booking {
   source: BookingSource;
   status: BookingStatus;
   paidAt?: string | null;
+  specialRequests?: string | null; 
   cancelledAt?: string;
   cancelReason?: string;
   createdAt: string;

@@ -34,10 +34,11 @@ const checkDateRange = (d: { checkInDate: string; checkOutDate: string }) => {
 
 export const createBookingSchema = z
   .object({
-    roomId: roomIdSchema,
-    checkInDate: checkInDateSchema,
-    checkOutDate: checkOutDateSchema,
-    guestCount: guestCountSchema,
+    roomId: z.coerce.number().int().min(1),
+    checkInDate: z.string().min(1, 'Vui lòng chọn ngày nhận phòng'),
+    checkOutDate: z.string().min(1, 'Vui lòng chọn ngày trả phòng'),
+    guestCount: z.coerce.number().int().min(1).max(MAX_GUESTS),
+    specialRequests: z.string().max(500).optional(),
   })
   .refine(
     (d) => new Date(d.checkOutDate) > new Date(d.checkInDate),

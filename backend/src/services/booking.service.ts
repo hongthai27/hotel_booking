@@ -73,6 +73,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
         totalAmount,
         source: 'online',
         status: 'pending_payment',
+        specialRequests: data.specialRequests, 
       },
     });
 

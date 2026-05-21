@@ -6,6 +6,7 @@ interface CreateBookingData {
   checkInDate: string;
   checkOutDate: string;
   guestCount: number;
+  specialRequests?: string;
 }
 
 interface CancelResponse {
