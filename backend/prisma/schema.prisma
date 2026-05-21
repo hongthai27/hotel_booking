@@ -72,6 +72,7 @@ enum PaymentFeeType {
 model User {
   id               Int        @id @default(autoincrement()) @map("user_id")
   fullName         String     @map("full_name") @db.VarChar(100)
+  avatarUrl        String?    @map("avatar_url") @db.VarChar(255)
   email            String     @unique @map("email") @db.VarChar(150)
   phoneNumber      String     @unique @map("phone_number") @db.VarChar(20)
   passwordHash     String     @map("password_hash") @db.VarChar(255)
@@ -81,7 +82,7 @@ model User {
   status           UserStatus @default(active) @map("status")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
-
+  
   // relations
   bookings        Booking[]  @relation("BookingCustomer")
   createdBookings Booking[]  @relation("BookingCreatedBy")
@@ -97,7 +98,7 @@ model RoomType {
   description String?  @map("description") @db.Text
   maxCapacity Int      @map("max_capacity")
   basePrice   Decimal  @map("base_price") @db.Decimal(12, 2)
-  version     Int      @default(0) @map("version") // <--- THÊM MỚI Ở ĐÂY
+  version     Int      @default(0) @map("version")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -116,7 +117,7 @@ model Room {
   floor        Int?       @map("floor")
   status       RoomStatus @default(available) @map("status")
   currentPrice Decimal    @map("current_price") @db.Decimal(12, 2)
-  version      Int        @default(0) @map("version") // <--- THÊM MỚI Ở ĐÂY
+  version      Int        @default(0) @map("version")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 

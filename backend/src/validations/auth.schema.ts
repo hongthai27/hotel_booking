@@ -27,7 +27,6 @@ export const registerSchema = z.object({
   password: passwordSchema,
 });
 
-// Cho phép login bằng email hoặc phoneNumber, ít nhất 1 trong 2 phải có
 export const loginSchema = z.object({
   identifier: z
     .string({ required_error: 'Email hoặc số điện thoại là bắt buộc' })
@@ -37,8 +36,6 @@ export const loginSchema = z.object({
 
 export type RegisterDto = z.infer<typeof registerSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;
-
-// ─── Forgot & Reset Password Schemas ──────────────────────────────────────────
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema, 
@@ -51,3 +48,19 @@ export const resetPasswordSchema = z.object({
 
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
+
+export const updateProfileSchema = z.object({
+  fullName: z.string().min(2, 'Họ tên tối thiểu 2 ký tự').optional(),
+  phoneNumber: z
+    .string()
+    .regex(/^\d{10,11}$/, 'Số điện thoại không hợp lệ')
+    .optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Nhập mật khẩu hiện tại'),
+  newPassword: z.string().min(6, 'Mật khẩu mới tối thiểu 6 ký tự'),
+});
+
+export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/auth.service';
 import { successResponse } from '../utils/response.util';
 import { catchAsync } from '../utils/catch-async.util';
+import { AppError } from '../utils/app-error.util';
 
 export const register = catchAsync(async (req: Request, res: Response) => {
   const user = await authService.register(req.body);
@@ -69,4 +70,26 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
     null,
     'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.'
   );
+});
+
+// ─── HANDLER MỚI ─────────────────────────────────────────────────────────────
+
+export const updateProfile = catchAsync(async (req: Request, res: Response) => {
+  const updated = await authService.updateProfile(req.user!.userId, req.body);
+  successResponse(res, updated, 'Cập nhật thông tin thành công');
+});
+
+export const uploadAvatar = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) throw new AppError(400, 'Vui lòng chọn file ảnh');
+  const updated = await authService.uploadAvatar(req.user!.userId, req.file);
+  successResponse(res, updated, 'Cập nhật ảnh đại diện thành công');
+});
+
+export const changePassword = catchAsync(async (req: Request, res: Response) => {
+  await authService.changePassword(
+    req.user!.userId,
+    req.body.currentPassword,
+    req.body.newPassword
+  );
+  successResponse(res, null, 'Đổi mật khẩu thành công');
 });

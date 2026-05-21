@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
 import { generateToken } from '../utils/jwt.util';
@@ -198,10 +199,10 @@ export const forgotPassword = async (email: string): Promise<void> => {
     where: { email: email.toLowerCase() },
   });
 
-  if (!user) return; // Chống dò quét email (enumeration)
+  if (!user) return;
 
   const token = crypto.randomBytes(32).toString('hex');
-  const expiry = new Date(Date.now() + 15 * 60 * 1000); // Hạn 15 phút
+  const expiry = new Date(Date.now() + 15 * 60 * 1000);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -230,8 +231,91 @@ export const resetPassword = async (token: string, newPassword: string): Promise
     where: { id: user.id },
     data: {
       passwordHash,
-      resetToken: null, // Thu hồi token sau khi dùng
+      resetToken: null,
       resetTokenExpiry: null,
     },
+  });
+};
+
+// ─── MỚI: CÁC HÀM CẬP NHẬT PROFILE ──────────────────────────────────────────
+
+export const updateProfile = async (
+  userId: number,
+  data: { fullName?: string; phoneNumber?: string }
+) => {
+  if (data.phoneNumber) {
+    const exists = await prisma.user.findFirst({
+      where: { phoneNumber: data.phoneNumber, id: { not: userId } },
+    });
+    if (exists) {
+      throw new AppError(409, 'Số điện thoại đã được dùng bởi tài khoản khác');
+    }
+  }
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: { ...data },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phoneNumber: true,
+      role: true,
+      status: true,
+      avatarUrl: true,
+    },
+  });
+};
+
+export const uploadAvatar = async (
+  userId: number,
+  file: Express.Multer.File
+) => {
+  const result = await cloudinary.uploader.upload(file.path, {
+    folder: 'hotel-booking/avatars',
+    transformation: [
+      { width: 200, height: 200, crop: 'fill', gravity: 'face' },
+    ],
+  });
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user?.avatarUrl) {
+    const publicId = user.avatarUrl.split('/').pop()?.split('.')[0];
+    if (publicId) {
+      await cloudinary.uploader
+        .destroy(`hotel-booking/avatars/${publicId}`)
+        .catch(() => {});
+    }
+  }
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: { avatarUrl: result.secure_url },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phoneNumber: true,
+      role: true,
+      status: true,
+      avatarUrl: true,
+    },
+  });
+};
+
+export const changePassword = async (
+  userId: number,
+  currentPassword: string,
+  newPassword: string
+) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'Không tìm thấy người dùng');
+
+  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isMatch) throw new AppError(400, 'Mật khẩu hiện tại không đúng');
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: await bcrypt.hash(newPassword, 10) },
   });
 };
