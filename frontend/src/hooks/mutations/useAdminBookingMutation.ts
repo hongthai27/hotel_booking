@@ -17,7 +17,15 @@ export const useCheckIn = () => {
   const invalidate = useInvalidateAdminBookings();
 
   return useMutation({
-    mutationFn: (id: number) => adminService.checkIn(id),
+    mutationFn: ({
+      id,
+      idNumber,
+      checkinNote,
+    }: {
+      id: number;
+      idNumber?: string;
+      checkinNote?: string;
+    }) => adminService.checkIn(id, { idNumber, checkinNote }),
     onSuccess: () => {
       invalidate();
       toast.success('Check-in thành công');
@@ -30,7 +38,13 @@ export const useCheckOut = () => {
   const invalidate = useInvalidateAdminBookings();
 
   return useMutation({
-    mutationFn: (id: number) => adminService.checkOut(id),
+    mutationFn: ({
+      id,
+      extraCharges,
+    }: {
+      id: number;
+      extraCharges: { label: string; amount: number }[];
+    }) => adminService.checkOut(id, extraCharges),
     onSuccess: () => {
       invalidate();
       toast.success('Check-out thành công');
@@ -61,6 +75,7 @@ export const useCreateOfflineBooking = () => {
       adminService.createOfflineBooking(data),
     onSuccess: () => {
       invalidate();
+      toast.success('Tạo đơn tại quầy thành công');
     },
     onError: handleError,
   });

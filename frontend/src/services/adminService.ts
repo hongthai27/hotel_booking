@@ -16,13 +16,13 @@ export const adminService = {
     return r.data.data;
   },
 
-  checkIn: async (id: number) => {
-    const r = await api.patch(`/admin/bookings/${id}/checkin`);
+  checkIn: async (id: number, data: { idNumber?: string; checkinNote?: string }) => {
+    const r = await api.patch(`/admin/bookings/${id}/checkin`, data);
     return r.data.data;
   },
 
-  checkOut: async (id: number) => {
-    const r = await api.patch(`/admin/bookings/${id}/checkout`);
+  checkOut: async (id: number, extraCharges: { label: string; amount: number }[]) => {
+    const r = await api.patch(`/admin/bookings/${id}/checkout`, { extraCharges });
     return r.data.data;
   },
 

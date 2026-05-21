@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAdminBookings } from '../../hooks/queries/useAdminBookingsQuery';
 import { 
-  useCheckIn, 
-  useCheckOut, 
   useCancelAdminBooking,
   useCreateOfflineBooking 
 } from '../../hooks/mutations/useAdminBookingMutation';
@@ -14,7 +12,8 @@ import { formatDate } from '../../utils/format';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import BookingStatusBadge from '../../components/common/BookingStatusBadge';
-// Đã xóa import PaymentStatusBadge thừa ở đây
+import CheckInModal from '../../components/admin/CheckInModal';
+import CheckOutModal from '../../components/admin/CheckOutModal';
 
 const SOURCE_LABEL: Record<string, string> = {
   online: 'Trực tuyến',
@@ -253,8 +252,8 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
 
 const BookingListPage = () => {
   const navigate = useNavigate();
-  const { mutate: checkIn, isPending: isCheckingIn } = useCheckIn();
-  const { mutate: checkOut, isPending: isCheckingOut } = useCheckOut();
+  const [checkinTarget, setCheckinTarget] = useState<any>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<any>(null);
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelAdminBooking();
 
   const [search, setSearch] = useState('');
@@ -308,7 +307,6 @@ const BookingListPage = () => {
   useSocketAllBookings(bookingIds);
 
   const renderBadges = (booking: any) => {
-    // 1. Nếu đơn bị hủy: Ưu tiên hiển thị trạng thái hoàn tiền (Chờ hoàn / Đã hoàn / Đã hủy)
     if (booking.status === 'cancelled') {
       const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
       if (isRefunded) {
@@ -335,7 +333,6 @@ const BookingListPage = () => {
       );
     }
 
-    // 2. Nếu đơn bình thường: CHỈ CẦN 1 THẺ BookingStatusBadge 
     return (
       <BookingStatusBadge status={booking.status} />
     );
@@ -453,7 +450,6 @@ const BookingListPage = () => {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {/* GỌI HÀM RENDER BADGE THÔNG MINH Ở ĐÂY */}
                     <div className="flex gap-2 flex-wrap">
                       {renderBadges(booking)}
                     </div>
@@ -469,12 +465,8 @@ const BookingListPage = () => {
 
                       {booking.status === 'confirmed' && (
                         <button
-                          onClick={() => {
-                            if (!window.confirm('Xác nhận check-in cho đơn này?')) return;
-                            checkIn(booking.id);
-                          }}
-                          disabled={isCheckingIn}
-                          className="text-green-600 text-sm font-medium hover:underline disabled:opacity-50"
+                          onClick={() => setCheckinTarget(booking)}
+                          className="text-green-600 text-sm font-medium hover:underline"
                         >
                           Check-in
                         </button>
@@ -482,12 +474,8 @@ const BookingListPage = () => {
 
                       {booking.status === 'checked_in' && (
                         <button
-                          onClick={() => {
-                            if (!window.confirm('Xác nhận check-out cho đơn này?')) return;
-                            checkOut(booking.id);
-                          }}
-                          disabled={isCheckingOut}
-                          className="text-purple-600 text-sm font-medium hover:underline disabled:opacity-50"
+                          onClick={() => setCheckoutTarget(booking)}
+                          className="text-purple-600 text-sm font-medium hover:underline"
                         >
                           Check-out
                         </button>
@@ -554,6 +542,24 @@ const BookingListPage = () => {
       </div>
 
       {showModal && <CreateOfflineBookingModal onClose={() => setShowModal(false)} />}
+      
+      {checkinTarget && (
+        <CheckInModal
+          booking={checkinTarget}
+          isOpen={!!checkinTarget}
+          onClose={() => setCheckinTarget(null)}
+          onSuccess={() => setCheckinTarget(null)}
+        />
+      )}
+
+      {checkoutTarget && (
+        <CheckOutModal
+          booking={checkoutTarget}
+          isOpen={!!checkoutTarget}
+          onClose={() => setCheckoutTarget(null)}
+          onSuccess={() => setCheckoutTarget(null)}
+        />
+      )}
     </div>
   );
 };

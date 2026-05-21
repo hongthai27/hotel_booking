@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import CompareBar from '../components/customer/CompareBar';
 
 const CustomerLayout = () => {
   const { user, logout } = useAuthStore();
@@ -112,9 +113,11 @@ const CustomerLayout = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6">
         <Outlet />
       </main>
+      
+      <CompareBar />
 
       <footer className="bg-primary-dark text-gray-400 text-sm text-center py-6 px-4">
         <p> 89 phường Hoàn Kiếm, TP. Hà Nội</p>

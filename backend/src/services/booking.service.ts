@@ -425,41 +425,29 @@ export const cancelBooking = async (
   return { refundAmount };
 };
 
-export const checkIn = async (bookingId: number, staffId: number) => {
+export const checkIn = async (
+  bookingId: number,
+  staffId: number,
+  data: { idNumber?: string; checkinNote?: string }
+) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { room: true }
   });
 
-  if (!booking) {
-    throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
-  }
+  if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
 
   if (booking.status !== 'confirmed') {
     throw new AppError(400, `Không thể check-in đơn ở trạng thái ${booking.status}`);
   }
 
-  const now = new Date();
-  const scheduledDate = new Date(booking.checkInDate); 
-
-  if (now < scheduledDate) {
-    throw new AppError(
-      400, 
-      `Chưa đến giờ nhận phòng tiêu chuẩn (Sau 14:00 ngày ${scheduledDate.toLocaleDateString('vi-VN')})`
-    );
-  }
-
-  if (booking.room.status !== 'available') {
-    throw new AppError(
-      400,
-      'Phòng hiện tại chưa sẵn sàng đón khách (Đang có khách khác ở hoặc đang dọn dẹp). Vui lòng đợi phòng sạch mới có thể check-in.'
-    );
-  }
-
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({
       where: { id: bookingId },
-      data: { status: 'checked_in' },
+      data: {
+        status: 'checked_in',
+        ...(data.idNumber && { idNumber: data.idNumber }),
+        ...(data.checkinNote && { checkinNote: data.checkinNote }),
+      },
     });
 
     await tx.room.update({
@@ -474,7 +462,7 @@ export const checkIn = async (bookingId: number, staffId: number) => {
       targetId: bookingId,
       action: 'UPDATE',
       oldValue: { status: booking.status },
-      newValue: { status: 'checked_in' },
+      newValue: { status: 'checked_in', idNumber: data.idNumber },
     });
   });
 
@@ -487,29 +475,52 @@ export const checkIn = async (bookingId: number, staffId: number) => {
   return { message: 'Check-in thành công' };
 };
 
-export const checkOut = async (bookingId: number, staffId: number) => {
+export const checkOut = async (
+  bookingId: number,
+  staffId: number,
+  extraCharges: { label: string; amount: number }[]
+) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
 
-  if (!booking) {
-    throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
-  }
+  if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
 
   if (booking.status !== 'checked_in') {
     throw new AppError(400, `Không thể check-out đơn ở trạng thái ${booking.status}`);
   }
 
+  const extraTotal = extraCharges.reduce((sum, c) => sum + c.amount, 0);
+
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({
       where: { id: bookingId },
-      data: { status: 'checked_out' },
+      data: {
+        status: 'checked_out',
+        extraCharges: extraCharges.length > 0 ? extraCharges : undefined,
+        extraTotal,
+      },
     });
 
     await tx.room.update({
       where: { id: booking.roomId },
       data: { status: 'cleaning' },
     });
+
+    // Tạo payment record phụ thu nếu có
+    if (extraTotal > 0) {
+      await tx.payment.create({
+        data: {
+          bookingId,
+          amount: extraTotal,
+          method: 'cash',
+          status: 'success',
+          feeType: 'booking',
+          paidAt: new Date(),
+          transactionRef: `EXTRA-${bookingId}-${Date.now()}`,
+        },
+      });
+    }
 
     await createAuditLog({
       tx,
@@ -518,7 +529,7 @@ export const checkOut = async (bookingId: number, staffId: number) => {
       targetId: bookingId,
       action: 'UPDATE',
       oldValue: { status: booking.status },
-      newValue: { status: 'checked_out' },
+      newValue: { status: 'checked_out', extraTotal },
     });
   });
 
@@ -528,7 +539,7 @@ export const checkOut = async (bookingId: number, staffId: number) => {
     roomStatus: 'cleaning',
   });
 
-  return { message: 'Check-out thành công' };
+  return { message: 'Check-out thành công', extraTotal };
 };
 
 export const createOfflineBooking = async (

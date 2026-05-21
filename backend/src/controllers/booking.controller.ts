@@ -80,20 +80,21 @@ export const getRefundPreview = catchAsync(async (req: Request, res: Response) =
 export const checkIn = catchAsync(async (req: Request, res: Response) => {
   const result = await bookingService.checkIn(
     Number(req.params.id),
-    req.user!.userId
+    req.user!.userId,
+    {
+      idNumber: req.body.idNumber,
+      checkinNote: req.body.checkinNote,
+    }
   );
-  const bookingId = Number(req.params.id);
-  emitBookingUpdate(bookingId, { status: 'checked_in', roomStatus: 'occupied' });
   successResponse(res, result, 'Check-in thành công');
 });
 
 export const checkOut = catchAsync(async (req: Request, res: Response) => {
   const result = await bookingService.checkOut(
     Number(req.params.id),
-    req.user!.userId
+    req.user!.userId,
+    req.body.extraCharges ?? []
   );
-  const bookingId = Number(req.params.id);
-  emitBookingUpdate(bookingId, { status: 'checked_out', roomStatus: 'cleaning' });
   successResponse(res, result, 'Check-out thành công');
 });
 
@@ -143,8 +144,8 @@ export const confirmRefund = catchAsync(async (req: Request, res: Response) => {
   
   if (result && result.bookingId) {
     emitBookingUpdate(result.bookingId, { 
-      status: 'cancelled', // Booking vẫn ở trạng thái huỷ
-      paymentStatus: 'refunded' // Báo cho frontend biết tiền đã hoàn
+      status: 'cancelled', 
+      paymentStatus: 'refunded' 
     });
   }
 

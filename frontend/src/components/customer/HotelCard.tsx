@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useCompareStore } from '../../stores/compareStore';
 import type { RoomType } from '../../types/hotel.types';
-
-const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
 
 interface Props {
   roomType: RoomType;
@@ -10,8 +9,14 @@ interface Props {
   guests?: number;
 }
 
+const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
+
+const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
+
 const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
   const navigate = useNavigate();
+  const { add, remove, isSelected } = useCompareStore();
+  const selected = isSelected(roomType.id);
 
   const image = roomType.images?.[0]?.imageUrl;
   const price = roomType.lowestPrice ?? roomType.basePrice;
@@ -24,6 +29,7 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
     if (checkOut) params.set('checkOut', checkOut);
     if (guests) params.set('guests', String(guests));
     const query = params.toString();
+    // Đã sửa lại đường dẫn chuẩn khớp với app.routes.tsx
     navigate(`/room-type/${roomType.id}${query ? `?${query}` : ''}`);
   };
 
@@ -32,39 +38,52 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
       onClick={handleClick}
       className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
     >
-      {image ? (
+      {/* Image */}
+      <div className="relative">
         <img
-          src={image}
+          src={image ?? PLACEHOLDER}
           alt={roomType.typeName}
           className="w-full h-48 object-cover"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
           }}
         />
-      ) : (
-        <img
-          src={PLACEHOLDER}
-          alt={roomType.typeName}
-          className="w-full h-48 object-cover"
-        />
-      )}
 
+        {/* Nút so sánh — góc trên trái */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            selected ? remove(roomType.id) : add(roomType);
+          }}
+          className={`absolute top-2 left-2 flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-all ${
+            selected
+              ? 'bg-primary text-white'
+              : 'bg-white/90 text-gray-600 hover:bg-primary/10'
+          }`}
+        >
+          {selected ? '✓ Đã chọn' : '+ So sánh'}
+        </button>
+
+        {/* Badge phòng trống */}
+        {roomType.availableRoomCount !== undefined && (
+          <span className={`absolute top-2 right-2 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm ${
+            roomType.availableRoomCount > 0
+              ? 'bg-green-50 text-green-700'
+              : 'bg-red-50 text-red-600'
+          }`}>
+            {roomType.availableRoomCount > 0
+              ? `Còn ${roomType.availableRoomCount} phòng`
+              : 'Hết phòng'}
+          </span>
+        )}
+      </div>
+
+      {/* Content */}
       <div className="p-5 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-gray-800 font-medium text-base leading-snug">
             {roomType.typeName}
           </h3>
-          {roomType.availableRoomCount !== undefined && (
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
-              roomType.availableRoomCount > 0
-                ? 'bg-green-50 text-green-700'
-                : 'bg-red-50 text-red-600'
-            }`}>
-              {roomType.availableRoomCount > 0
-                ? `Còn ${roomType.availableRoomCount} phòng`
-                : 'Hết phòng'}
-            </span>
-          )}
         </div>
 
         <p className="text-gray-500 text-sm font-normal">
@@ -73,9 +92,9 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
 
         {visibleAmenities.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {visibleAmenities.map((amenity, index) => (
+            {visibleAmenities.map((amenity) => (
               <span
-                key={`${amenity.id ?? 'amenity'}-${index}`}
+                key={amenity.id}
                 className="text-xs font-normal px-2.5 py-1 rounded-full bg-primary/5 text-primary"
               >
                 {amenity.amenityName}
@@ -91,11 +110,11 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
 
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div>
-            <span className="text-xs text-gray-400 font-normal">Từ</span>
+            <span className="text-xs text-gray-400">Từ </span>
             <p className="text-primary font-medium text-lg leading-tight">
-              {price.toLocaleString('vi-VN')}đ
+              {formatVND(price)}
             </p>
-            <span className="text-xs text-gray-400 font-normal">/ đêm</span>
+            <span className="text-xs text-gray-400">/ đêm</span>
           </div>
           <button
             onClick={(e) => {
