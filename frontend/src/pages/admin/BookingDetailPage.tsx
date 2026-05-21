@@ -9,14 +9,154 @@ import {
   useCancelAdminBooking 
 } from '../../hooks/mutations/useAdminBookingMutation';
 import { formatVND, formatDate } from '../../utils/format';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import type { Booking } from '../../types/booking.types';
 
+type BookingDetail = Booking & {
+  customer?: {
+    fullName?: string;
+    phoneNumber?: string;
+    email?: string;
+  };
+  totalPrice?: number;
+  paymentMethod?: string;
+  paymentDeadline?: string | Date;
+  totalNights?: number;
+};
 // ── UTILS ──
-const formatDateTime = (dateStr: string) => {
+const formatDateTime = (dateStr: string | Date) => {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('vi-VN', { 
     hour: '2-digit', minute: '2-digit', 
     day: '2-digit', month: '2-digit', year: 'numeric' 
   });
+};
+
+const calcNights = (checkIn: string, checkOut: string): number =>
+  Math.ceil(
+    (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000
+  );
+
+const exportInvoice = (booking: BookingDetail) => {
+  const doc = new jsPDF();
+  const primary: [number, number, number] = [15, 76, 129];
+
+  // Header
+  doc.setFillColor(...primary);
+  doc.rect(0, 0, 210, 35, 'F');
+
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text('HOA DON DAT PHONG', 14, 18);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Hotel Booking System', 14, 27);
+
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`#${booking.id}`, 196, 22, { align: 'right' });
+
+  // Thong tin khach
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('THONG TIN KHACH HANG', 14, 50);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Ho ten:        ${booking.customer?.fullName ?? ''}`, 14, 60);
+  doc.text(`So dien thoai: ${booking.customer?.phoneNumber ?? ''}`, 14, 67);
+  doc.text(`Email:         ${booking.customer?.email ?? ''}`, 14, 74);
+
+  // Thong tin dat phong
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('THONG TIN DAT PHONG', 14, 90);
+
+  autoTable(doc, {
+    startY: 95,
+    head: [['Hang phong', 'So phong', 'Nhan phong', 'Tra phong', 'So dem', 'So khach']],
+    body: [[
+      booking.room?.roomType?.typeName ?? '',
+      booking.room?.roomNumber ?? '',
+      formatDate(booking.checkInDate),
+      formatDate(booking.checkOutDate),
+      String(calcNights(booking.checkInDate, booking.checkOutDate)),
+      String(booking.guestCount),
+    ]],
+    headStyles: { fillColor: primary, fontSize: 9 },
+    bodyStyles: { fontSize: 10 },
+    margin: { left: 14 },
+  });
+
+  // Thanh toan
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('THANH TOAN', 14, finalY);
+
+  const paymentMethod = booking.payments?.[0]?.method;
+  const paymentStatus = booking.payments?.[0]?.status;
+
+  const methodLabel =
+    paymentMethod === 'qr_code'
+      ? 'Chuyen khoan QR'
+      : paymentMethod === 'cash'
+      ? 'Tien mat'
+      : paymentMethod === 'card'
+      ? 'Quet the'
+      : '';
+
+  const statusLabel = paymentStatus === 'success' ? 'Da thanh toan' : (paymentStatus ?? '');
+  const amount = booking.totalPrice ?? booking.totalAmount ?? 0;
+
+  autoTable(doc, {
+    startY: finalY + 5,
+    head: [['Noi dung', 'So tien']],
+    body: [
+      ['Tien phong', formatVND(amount)],
+      ['Phuong thuc', methodLabel],
+      ['Trang thai', statusLabel],
+    ],
+    headStyles: { fillColor: primary, fontSize: 9 },
+    bodyStyles: { fontSize: 10 },
+    columnStyles: { 1: { halign: 'right' } },
+    margin: { left: 14 },
+  });
+
+  // Tong tien
+  const payY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFillColor(240, 247, 255);
+  doc.rect(14, payY - 5, 182, 16, 'F');
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...primary);
+  doc.text('TONG CONG:', 18, payY + 5);
+  doc.text(formatVND(amount), 196, payY + 5, { align: 'right' });
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(150, 150, 150);
+  const footY = doc.internal.pageSize.height - 15;
+  doc.text(
+    'Cam on quy khach da lua chon Hotel Booking!',
+    105, footY, { align: 'center' }
+  );
+  doc.text(
+    `Ngay xuat: ${new Date().toLocaleDateString('vi-VN')}`,
+    105, footY + 6, { align: 'center' }
+  );
+
+  doc.save(`hoa-don-booking-${booking.id}.pdf`);
 };
 
 // ── CONSTANTS ──
@@ -61,7 +201,7 @@ const BookingDetailPage = () => {
     queryFn: () => bookingService.getById(Number(id)),
     enabled: !!id,
   });
-  const booking = data as any;
+  const booking = data as BookingDetail;
   
   // Hooks thao tác (Mutations)
   const { mutate: checkIn, isPending: isCheckingIn } = useCheckIn();
@@ -113,20 +253,38 @@ const BookingDetailPage = () => {
 
   const PAY_STATUS = getPaymentStatus();
 
+  // Biến kiểm tra điều kiện xuất PDF
+  const isPaid = booking?.payments?.some((p: any) => p.status === 'success') ?? false;
+
   return (
     <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
       
-      {/* ── HEADER ── */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors shadow-sm"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-          </svg>
-        </button>
-        <h2 className="text-xl font-semibold text-gray-800">Chi tiết đơn đặt phòng</h2>
+      {/* ── HEADER CÓ THÊM NÚT XUẤT PDF ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors shadow-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+          </button>
+          <h2 className="text-xl font-semibold text-gray-800">Chi tiết đơn đặt phòng</h2>
+        </div>
+
+        {/* Nút Xuất PDF được tiêm vào đây */}
+        {isPaid && (
+          <button
+            onClick={() => exportInvoice(booking)}
+            className="flex items-center justify-center gap-2 text-sm font-medium text-white bg-primary px-4 py-2 rounded-xl hover:bg-primary-dark transition-colors shadow-sm w-fit"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+            Xuất hóa đơn PDF
+          </button>
+        )}
       </div>
 
       {/* ── STATES ── */}
