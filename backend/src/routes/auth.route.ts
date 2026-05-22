@@ -11,13 +11,23 @@ import {
   updateProfileSchema,
   changePasswordSchema,
 } from '../validations/auth.schema';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
+// 1. Định nghĩa đường dẫn tới thư mục uploads (nằm cùng cấp với src hoặc trong backend)
+const uploadDir = path.join(__dirname, '../../uploads'); 
+
+// 2. Kiểm tra nếu chưa có thư mục thì tự tạo ra
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 // Cấu hình Multer để upload avatar
 const uploadAvatar = multer({
   storage: multer.diskStorage({
-    destination: '/tmp',
+    // Sử dụng đường dẫn an toàn đã tạo ở trên
+    destination: (req, file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => cb(null, `avatar-${Date.now()}-${file.originalname}`),
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
