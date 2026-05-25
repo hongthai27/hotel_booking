@@ -17,6 +17,114 @@ const formatDate = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Component thanh trượt giá 2 đầu tự thiết kế (Native HTML5 Range)
+const DualPriceSlider = ({
+  priceMin,
+  priceMax,
+  onChange,
+}: {
+  priceMin: number | '';
+  priceMax: number | '';
+  onChange: (min: number | '', max: number | '') => void;
+}) => {
+  const minLimit = 0;
+  const maxLimit = 10000000; // Giới hạn tối đa là 10 triệu
+  
+  // Nếu trống thì lấy mặc định mốc min/max
+  const currentMin = priceMin === '' ? minLimit : priceMin;
+  const currentMax = priceMax === '' ? maxLimit : priceMax;
+
+  const getPercent = (val: number) => Math.round(((val - minLimit) / (maxLimit - minLimit)) * 100);
+
+  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Math.min(Number(e.target.value), currentMax - 100000);
+    if (val === minLimit && currentMax === maxLimit) {
+      onChange('', '');
+    } else {
+      onChange(val === minLimit ? '' : val, currentMax === maxLimit ? '' : currentMax);
+    }
+  };
+
+  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Math.max(Number(e.target.value), currentMin + 100000);
+    if (currentMin === minLimit && val === maxLimit) {
+      onChange('', '');
+    } else {
+      onChange(currentMin === minLimit ? '' : currentMin, val === maxLimit ? '' : val);
+    }
+  };
+
+  return (
+    <div className="w-full flex flex-col gap-3">
+      <style>
+        {`
+          .dual-range::-webkit-slider-thumb {
+            pointer-events: auto;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #2563eb;
+            cursor: pointer;
+            -webkit-appearance: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          }
+          .dual-range::-moz-range-thumb {
+            pointer-events: auto;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #2563eb;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: none;
+          }
+        `}
+      </style>
+
+      <div className="relative w-full h-8 flex items-center justify-center">
+        <div className="absolute w-full h-1.5 bg-gray-200 rounded-full z-0" />
+        <div
+          className="absolute h-1.5 bg-primary rounded-full z-10"
+          style={{
+            left: `${getPercent(currentMin)}%`,
+            right: `${100 - getPercent(currentMax)}%`,
+          }}
+        />
+        <input
+          type="range"
+          min={minLimit}
+          max={maxLimit}
+          step={100000} // Nhảy mỗi bước là 100.000đ
+          value={currentMin}
+          onChange={handleMinChange}
+          className="dual-range absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none z-20"
+        />
+        <input
+          type="range"
+          min={minLimit}
+          max={maxLimit}
+          step={100000}
+          value={currentMax}
+          onChange={handleMaxChange}
+          className="dual-range absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none z-20"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm text-gray-700 bg-gray-50 text-center font-medium whitespace-nowrap">
+          {formatVND(currentMin)}
+        </div>
+        <span className="text-gray-400">-</span>
+        <div className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm text-gray-700 bg-gray-50 text-center font-medium whitespace-nowrap">
+          {currentMax >= maxLimit ? '10M+' : formatVND(currentMax)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SkeletonCard = () => (
   <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm animate-pulse">
     <div className="h-48 bg-gray-200" />
@@ -90,7 +198,7 @@ const DiscoveryCollections = () => {
                   <div className="flex flex-wrap gap-1">
                     {rt.amenities?.slice(0, 3).map((a: any) => (
                       <span key={a.id || a.amenityId} className="text-xs bg-gray-50 border border-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                        {a.amenityName}
+                        {a.amenity?.amenityName || a.amenityName}
                       </span>
                     ))}
                     {(rt.amenities?.length ?? 0) > 3 && (
@@ -184,7 +292,7 @@ const RoomListPage = () => {
     if (selectedAmenities.length > 0) {
       list = list.filter((rt) =>
         selectedAmenities.every((name) =>
-          rt.amenities?.some((a: any) => a.amenityName === name)
+          rt.amenities?.some((a: any) => (a.amenity?.amenityName || a.amenityName) === name)
         )
       );
     }
@@ -204,10 +312,18 @@ const RoomListPage = () => {
     return list;
   }, [rooms, selectedAmenities, sort]);
 
-  const allAmenities = useMemo(() => {
-    const set = new Set<string>();
-    rooms.forEach((rt: any) => rt.amenities?.forEach((a: any) => set.add(a.amenityName)));
-    return Array.from(set);
+  const amenityCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rooms.forEach((rt: any) => {
+      const uniqueAmenities = new Set<string>();
+      rt.amenities?.forEach((a: any) => {
+        const name = a.amenity?.amenityName || a.amenityName;
+        if (name) uniqueAmenities.add(name);
+      });
+      uniqueAmenities.forEach(name => { counts[name] = (counts[name] || 0) + 1; });
+    });
+    // Chuyển thành mảng và sắp xếp ưu tiên những tiện ích có nhiều phòng nhất lên đầu
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [rooms]);
 
   const toggleAmenity = (name: string) =>
@@ -297,25 +413,13 @@ const RoomListPage = () => {
 
             <div className="mb-6">
               <p className="text-base font-medium text-gray-700 mb-3">Giá / đêm</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Từ"
-                  value={priceMin}
-                  onChange={(e) => setPriceMin(e.target.value ? Number(e.target.value) : '')}
-                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm w-full focus:outline-none"
-                />
-                <span className="text-gray-400">-</span>
-                <input
-                  type="number"
-                  placeholder="Đến"
-                  value={priceMax}
-                  onChange={(e) => setPriceMax(e.target.value ? Number(e.target.value) : '')}
-                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm w-full focus:outline-none"
-                />
-              </div>
+              <DualPriceSlider 
+                priceMin={priceMin} 
+                priceMax={priceMax} 
+                onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }} 
+              />
 
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-4">
                 {[
                   { label: 'Dưới 1tr', min: undefined, max: 1000000 },
                   { label: '1 - 3tr', min: 1000000, max: 3000000 },
@@ -342,19 +446,22 @@ const RoomListPage = () => {
               </div>
             </div>
 
-            {allAmenities.length > 0 && (
+            {amenityCounts.length > 0 && (
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-base font-medium text-gray-700 mb-3">Tiện ích</p>
                 <div className="flex flex-col gap-2.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                  {allAmenities.map((name) => (
-                    <label key={name} className="flex items-center gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={selectedAmenities.includes(name)}
-                        onChange={() => toggleAmenity(name)}
-                        className="w-4 h-4 rounded border-gray-300 text-primary accent-primary"
-                      />
-                      <span className="text-base text-gray-600 group-hover:text-gray-800 transition-colors">{name}</span>
+                  {amenityCounts.map(([name, count]) => (
+                    <label key={name} className="flex items-center justify-between cursor-pointer group">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedAmenities.includes(name)}
+                          onChange={() => toggleAmenity(name)}
+                          className="w-4 h-4 rounded border-gray-300 text-primary accent-primary"
+                        />
+                        <span className="text-base text-gray-600 group-hover:text-gray-800 transition-colors">{name}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{count}</span>
                     </label>
                   ))}
                 </div>
@@ -409,39 +516,52 @@ const RoomListPage = () => {
             </div>
           </div>
 
+          {/* Tag bộ lọc đang chọn (Active Filter Pills) */}
+          {hasFilter && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-sm text-gray-500 mr-1">Đang lọc theo:</span>
+              {(priceMin !== '' || priceMax !== '') && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-sm text-blue-700">
+                  Giá: {priceMin ? formatVND(Number(priceMin)) : '0đ'} - {priceMax ? formatVND(Number(priceMax)) : 'Trở lên'}
+                  <button onClick={() => { setPriceMin(''); setPriceMax(''); }} className="hover:text-blue-900 ml-1 text-base leading-none">&times;</button>
+                </span>
+              )}
+              {selectedAmenities.map((name) => (
+                <span key={name} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-sm text-blue-700">
+                  {name}
+                  <button onClick={() => toggleAmenity(name)} className="hover:text-blue-900 ml-1 text-base leading-none">&times;</button>
+                </span>
+              ))}
+              <button onClick={clearFilters} className="text-sm text-gray-400 hover:text-gray-700 underline ml-2 transition-colors">
+                Xóa tất cả
+              </button>
+            </div>
+          )}
+
           {showFilter && (
             <div className="lg:hidden bg-white border border-gray-100 rounded-2xl p-5 mb-4 shadow-sm">
               <p className="text-base font-medium text-gray-700 mb-2">Giá / đêm</p>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="number"
-                  placeholder="Giá từ"
-                  value={priceMin}
-                  onChange={(e) => setPriceMin(e.target.value ? Number(e.target.value) : '')}
-                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-base flex-1"
-                />
-                <input
-                  type="number"
-                  placeholder="Giá đến"
-                  value={priceMax}
-                  onChange={(e) => setPriceMax(e.target.value ? Number(e.target.value) : '')}
-                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-base flex-1"
+              <div className="mb-4">
+                <DualPriceSlider 
+                  priceMin={priceMin} 
+                  priceMax={priceMax} 
+                  onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }} 
                 />
               </div>
 
               <p className="text-base font-medium text-gray-700 mb-2">Tiện ích</p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {allAmenities.map((name) => (
+                {amenityCounts.map(([name, count]) => (
                   <button
                     key={name}
                     onClick={() => toggleAmenity(name)}
                     className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
                       selectedAmenities.includes(name)
                         ? 'bg-primary text-white border-primary'
-                        : 'border-gray-200 text-gray-600'
+                        : 'border-gray-200 text-gray-600 hover:border-primary/50'
                     }`}
                   >
-                    {name}
+                    {name} ({count})
                   </button>
                 ))}
               </div>
