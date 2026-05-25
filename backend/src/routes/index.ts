@@ -3,6 +3,8 @@ import authRouter from './auth.route';
 import hotelRouter from './hotel.route';
 import bookingRouter from './booking.route';
 import paymentRouter from './payment.route';
+import promotionRouter from './promotion.route';
+import adminRouter from './admin.routes';
 
 export const router = Router();
 
@@ -14,5 +16,7 @@ router.use('/auth', authRouter);
 router.use('/', hotelRouter);
 router.use('/', bookingRouter);
 router.use('/', paymentRouter);
+router.use('/promotions', promotionRouter);
+router.use('/admin', adminRouter);
 
 // TODO: router.use('/users', userRouter);

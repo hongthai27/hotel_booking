@@ -117,7 +117,7 @@ const PaymentPage = () => {
   const isFailed = statusData?.paymentStatus === 'failed';
 
   return (
-    <div className="max-w-md mx-auto flex flex-col gap-6 py-8">
+    <div className="max-w-lg mx-auto flex flex-col gap-6 py-8">
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col items-center gap-5">
         <div className="text-center">
           <h2 className="text-lg font-medium text-gray-800 mb-1">

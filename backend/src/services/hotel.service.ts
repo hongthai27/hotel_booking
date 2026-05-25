@@ -167,7 +167,7 @@ export const updateRoomType = async (
       });
     }
 
-    const updated = await tx.roomType.update({
+    const updateResult = await tx.roomType.updateMany({
       where: {
         id,
         version: data.version,
@@ -179,12 +179,16 @@ export const updateRoomType = async (
         ...(data.maxCapacity && { maxCapacity: data.maxCapacity }),
         version: { increment: 1 },
       },
-    }).catch(() => {
+    });
+
+    if (updateResult.count === 0) {
       throw new AppError(
         409,
         'Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang và thử lại.'
       );
-    });
+    }
+
+    const updated = await tx.roomType.findUniqueOrThrow({ where: { id } });
 
     if (data.amenityIds !== undefined) {
       await tx.roomTypeAmenity.deleteMany({
@@ -293,7 +297,7 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
 
   // Thêm type annotation Prisma.RoomWhereInput
   const availableRoomCondition: Prisma.RoomWhereInput = {
-    status: 'available',
+    status: { not: 'maintenance' },
     bookings: {
       none: {
         status: { notIn: ['cancelled'] as BookingStatus[] },
@@ -453,8 +457,7 @@ export const updateRoomStatus = async (
       const activeBooking = await tx.booking.findFirst({
         where: {
           roomId,
-          status: { in: ['confirmed', 'checked_in'] },
-          checkOutDate: { gt: new Date() },
+          status: 'checked_in' as BookingStatus,
         },
       });
 
@@ -466,23 +469,27 @@ export const updateRoomStatus = async (
       }
     }
 
-    // Khóa atomic: Đảm bảo version khớp 100% lúc chạm vào DB
-    const updated = await tx.room.update({
+    // Khóa atomic: Đảm bảo version khớp 100% lúc chạm vào DB bằng updateMany
+    const updateResult = await tx.room.updateMany({
       where: { 
         id: roomId,
-        version: currentVersion // <-- Chốt chặn an toàn thêm vào đây
+        version: currentVersion
       },
       data: {
         status: newStatus as any,
         version: { increment: 1 }, // Tự động tăng version
       },
-    }).catch(() => {
+    });
+
+    if (updateResult.count === 0) {
       // Bắt lỗi nếu version bị thay đổi trong tíc tắc
       throw new AppError(
         409,
         'Trạng thái phòng vừa được thay đổi bởi nhân viên khác. Vui lòng tải lại.'
       );
-    });
+    }
+
+    const updated = await tx.room.findUniqueOrThrow({ where: { id: roomId } });
 
     await createAuditLog({
       tx,

@@ -35,16 +35,12 @@ const CustomerLayout = () => {
           Hotel Booking
         </NavLink>
 
-        <nav className="flex items-center gap-6">
-          <NavLink to="/" end className={navLinkClass}>
-            Trang chủ
-          </NavLink>
-          <NavLink to="/about" className={navLinkClass}>
-            Về chúng tôi
-          </NavLink>
-          <NavLink to="/rooms" className={navLinkClass}>
-            Đặt phòng
-          </NavLink>
+        <nav className="hidden md:flex items-center gap-6">
+          <NavLink to="/" end className={navLinkClass}>Trang chủ</NavLink>
+          <NavLink to="/about"   className={navLinkClass}>Về chúng tôi</NavLink>
+          <NavLink to="/rooms"   className={navLinkClass}>Đặt phòng</NavLink>
+          <NavLink to="/contact" className={navLinkClass}>Liên hệ</NavLink>
+          <NavLink to="/promotions" className={navLinkClass}>Ưu đãi</NavLink>
         </nav>
 
         <div className="flex items-center gap-3">
@@ -113,7 +109,7 @@ const CustomerLayout = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6">
         <Outlet />
       </main>
       

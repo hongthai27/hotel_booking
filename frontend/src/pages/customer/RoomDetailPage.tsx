@@ -38,7 +38,7 @@ const RoomDetailPage = () => {
   );
 
   const nights = calcNights(checkIn, checkOut);
-  const basePrice = roomType?.basePrice ?? 0;
+  const basePrice = Number(roomType?.basePrice ?? 0);
   const total = nights * basePrice;
 
   // 8. Không crash nếu thiếu ảnh & Sắp xếp theo displayOrder
@@ -103,7 +103,7 @@ const RoomDetailPage = () => {
   const currentImage = images[activeIndex]?.imageUrl ?? PLACEHOLDER;
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8 p-6">
+    <div className="max-w-7xl mx-auto flex flex-col gap-8 p-6">
       {/* ── Breadcrumb ── */}
       <button
         onClick={() => navigate(-1)}
@@ -142,14 +142,18 @@ const RoomDetailPage = () => {
                     disabled={images.length <= 1}
                     className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white text-gray-800 rounded-full flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed border-none cursor-pointer text-lg font-bold"
                   >
-                    ‹
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                    </svg>
                   </button>
                   <button
                     onClick={handleNext}
                     disabled={images.length <= 1}
                     className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white text-gray-800 rounded-full flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed border-none cursor-pointer text-lg font-bold"
                   >
-                    ›
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
                   </button>
                 </>
               )}

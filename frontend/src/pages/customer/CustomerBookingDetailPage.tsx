@@ -1,15 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingService } from '../../services/booking.service';
 import { formatVND, formatDate, calcNights } from '../../utils/format';
 import CancelBookingModal from '../../components/customer/CancelBookingModal';
 import { useState } from 'react';
+import ReviewForm from '../../components/customer/ReviewForm';
 
 const PLACEHOLDER = 'https://placehold.co/800x400?text=No+Image';
 
 const CustomerBookingDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showCancel, setShowCancel] = useState(false);
 
   const { data: booking, isLoading, isError } = useQuery({
@@ -56,7 +58,7 @@ const CustomerBookingDetailPage = () => {
       const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
       if (isRefunded) return { label: 'Đã hoàn tiền', cls: 'text-gray-600' };
       
-      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending');
+      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending_refund');
       if (isPendingRefund) return { label: 'Chờ hoàn tiền', cls: 'text-orange-600' };
       
       return { label: 'Đã hủy', cls: 'text-gray-500' };
@@ -72,8 +74,12 @@ const CustomerBookingDetailPage = () => {
   const PAY_STATUS = getPaymentStatus();
   const canCancel = ['confirmed', 'pending_payment'].includes(booking.status);
 
+  const discountAmount = Number((booking as any).discountAmount) || 0;
+  const promoCode = (booking as any).promoCode;
+  const bookingSource = (booking as any).source || 'online';
+
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-3xl mx-auto py-8 px-4">
       <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => navigate('/my-bookings')}
@@ -158,10 +164,10 @@ const CustomerBookingDetailPage = () => {
             <span className={`font-medium ${PAY_STATUS.cls}`}>{PAY_STATUS.label}</span>
           </div>
           
-          {bookingPayment?.paidAt && (
+          {booking.paidAt && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Thời gian thanh toán</span>
-              <span className="text-gray-800">{formatDate(bookingPayment.paidAt)}</span>
+              <span className="text-gray-800">{formatDate(booking.paidAt)}</span>
             </div>
           )}
           {bookingPayment?.transactionRef && (
@@ -173,14 +179,30 @@ const CustomerBookingDetailPage = () => {
             </div>
           )}
 
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-green-600">Ưu đãi {promoCode ? `(${promoCode})` : ''}</span>
+              <span className="font-medium text-green-600">
+                - {formatVND(discountAmount)}
+              </span>
+            </div>
+          )}
+
           <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">Tổng tiền</span>
-            <span className="text-xl font-medium text-primary">
-              {formatVND(booking.totalAmount)}
-            </span>
+            <div className="flex flex-col items-end">
+              {discountAmount > 0 && (
+                <span className="text-xs text-gray-400 line-through mb-0.5">
+                  {formatVND(Number(booking.totalAmount) + discountAmount)}
+                </span>
+              )}
+              <span className="text-xl font-medium text-primary">
+                {formatVND(booking.totalAmount)}
+              </span>
+            </div>
           </div>
 
-          {booking.status === 'cancelled' && booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending') && (
+          {booking.status === 'cancelled' && booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending_refund') && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700 mt-2">
               <span>Đang xử lý hoàn tiền (dự kiến 3–5 ngày làm việc)</span>
             </div>
@@ -198,14 +220,48 @@ const CustomerBookingDetailPage = () => {
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Nguồn đặt phòng</span>
           <span className={`font-medium px-2.5 py-1 rounded-full text-xs border ${
-            booking.source === 'online'
+            bookingSource === 'online'
               ? 'bg-blue-50 text-blue-700 border-blue-200'
               : 'bg-orange-50 text-orange-700 border-orange-200'
           }`}>
-            {booking.source === 'online' ? 'Trực tuyến' : 'Tại quầy'}
+            {bookingSource === 'online' ? 'Trực tuyến' : 'Tại quầy'}
           </span>
         </div>
       </div>
+
+      {booking.status === 'checked_out' && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-6">
+          <h2 className="text-sm font-medium text-gray-800 mb-4">Đánh giá trải nghiệm</h2>
+          
+          {!booking.review ? (
+            <ReviewForm 
+              bookingId={booking.id} 
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['bookings', +id!] });
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
+              }}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <div className="flex text-amber-400 gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={i < booking.review.rating ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                    </svg>
+                  ))}
+                </div>
+                <span className="text-xs text-gray-400">Bạn đã đánh giá vào {formatDate(booking.review.createdAt)}</span>
+              </div>
+              {booking.review.comment && (
+                <p className="text-sm text-gray-600 mt-2 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  {booking.review.comment}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-3">
         {booking.status === 'pending_payment' && (

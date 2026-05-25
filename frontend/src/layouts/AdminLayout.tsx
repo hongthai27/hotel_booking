@@ -28,6 +28,8 @@ const AdminLayout = () => {
   const [showNotif, setShowNotif] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -58,6 +60,9 @@ const AdminLayout = () => {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setShowNotif(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -93,13 +98,13 @@ const AdminLayout = () => {
       <aside className={`
         fixed top-0 left-0 h-screen z-50 w-60 bg-primary-dark flex flex-col py-6 px-3 transition-transform duration-300
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        md:translate-x-0 md:static
+        md:translate-x-0 md:sticky md:top-0
       `}>
-        <div className="text-white font-medium text-lg px-4 pb-6 border-b border-white/10 mb-4">
+        <div className="text-white font-medium text-lg px-4 pb-6 border-b border-white/10 mb-4 shrink-0">
           Hotel Booking
         </div>
 
-        <nav className="flex flex-col gap-1" onClick={() => setSidebarOpen(false)}>
+        <nav className="flex flex-col gap-1 flex-1 overflow-y-auto scrollbar-hide pb-4" onClick={() => setSidebarOpen(false)}>
           <NavLink to="/admin/dashboard" className={navLinkClass}>Sơ đồ phòng</NavLink>
           <NavLink to="/admin/bookings" className={navLinkClass}>Quản lý đơn đặt phòng</NavLink>
           <NavLink to="/admin/refunds" className={navLinkClass}>Quản lý hoàn tiền</NavLink>
@@ -109,6 +114,7 @@ const AdminLayout = () => {
               <NavLink to="/admin/reports" className={navLinkClass}>Báo cáo</NavLink>
               <NavLink to="/admin/users" className={navLinkClass}>Quản lý tài khoản</NavLink>
               <NavLink to="/admin/amenities" className={navLinkClass}>Quản lý tiện ích</NavLink>
+              <NavLink to="/admin/promotions" className={navLinkClass}>Quản lý khuyến mãi</NavLink>
             </>
           )}
         </nav>
@@ -129,16 +135,18 @@ const AdminLayout = () => {
              {/* Notification Bell */}
              <div className="relative" ref={notifRef}>
               <button onClick={handleOpenNotif} className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
-                🔔
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-gray-600">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
                 {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-medium rounded-full flex items-center justify-center px-1">
+                  <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
               
               {showNotif && (
-                <div className="absolute right-0 top-12 w-80 bg-white border border-gray-100 rounded-2xl shadow-lg z-50 overflow-hidden">
+                <div className="absolute -right-4 sm:right-0 top-12 w-[300px] sm:w-80 bg-white border border-gray-100 rounded-2xl shadow-lg z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                     <span className="text-sm font-medium">Thông báo mới</span>
                     {notifications.length > 0 && (
@@ -163,28 +171,61 @@ const AdminLayout = () => {
             </div>
 
             {user?.role && (
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              <span className={`hidden sm:inline-block px-3 py-1 rounded-full text-xs font-medium ${
                 user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700'
               }`}>
                 {ROLE_LABEL[user.role] ?? user.role}
               </span>
             )}
             
-            <span className="text-sm font-medium text-gray-800 hidden sm:inline-block">
-              {user?.fullName}
-              <Link
-                to="/profile"
-                className="ml-2 text-xs text-gray-400 hover:text-primary transition-colors"
+            {/* User Profile Dropdown */}
+            <div className="relative ml-2" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen((prev) => !prev)}
+                className="flex items-center gap-2 bg-transparent border-none cursor-pointer"
               >
-                Sửa hồ sơ
-              </Link>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              Đăng xuất
-            </button>
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center font-medium text-primary text-sm border border-primary/20">
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.fullName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user?.fullName?.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <span className="text-sm font-medium text-gray-800 hidden sm:block">
+                  {user?.fullName}
+                </span>
+                <svg className={`w-4 h-4 text-gray-500 transition-transform hidden sm:block ${profileOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 top-12 bg-white border border-gray-100 rounded-2xl min-w-[200px] shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-800 truncate">{user?.fullName}</p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  </div>
+                  <Link
+                    to="/admin/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="block px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 no-underline"
+                  >
+                    Hồ sơ cá nhân
+                  </Link>
+                  <hr className="border-gray-100 m-0" />
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full px-4 py-3 bg-transparent border-none cursor-pointer text-red-500 text-sm text-left hover:bg-red-50 font-medium"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

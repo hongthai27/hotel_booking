@@ -23,6 +23,10 @@ const CheckInModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
   const checkInMutation = useCheckIn();
 
   const handleSubmit = async () => {
+    if (!idNumber.trim()) {
+      toast.error('Vui lòng nhập số CCCD hoặc Hộ chiếu');
+      return;
+    }
     if (!confirmed) {
       toast.error('Vui lòng xác nhận đã kiểm tra giấy tờ');
       return;
@@ -93,8 +97,7 @@ const CheckInModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
           {/* Số CCCD */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-gray-600">
-              Số CCCD / Hộ chiếu{' '}
-              <span className="text-gray-400 font-normal">(không bắt buộc)</span>
+              Số CCCD / Hộ chiếu <span className="text-red-500">*</span>
             </label>
             <input
               value={idNumber}
@@ -154,7 +157,7 @@ const CheckInModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!confirmed || checkInMutation.isPending}
+            disabled={!confirmed || !idNumber.trim() || checkInMutation.isPending}
             className="text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-xl flex items-center gap-2 transition-colors"
           >
             {checkInMutation.isPending && (

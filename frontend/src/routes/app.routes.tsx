@@ -21,6 +21,8 @@ const ResetPasswordPage = lazy(() => import('../pages/customer/ResetPasswordPage
 const CustomerBookingDetailPage = lazy(() => import('../pages/customer/CustomerBookingDetailPage'));
 const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 const ComparePage = lazy(() => import('../pages/customer/ComparePage'));
+const PromotionsPage = lazy(() => import('../pages/customer/PromotionsPage'))
+const ContactPage = lazy(() => import('../pages/customer/ContactPage'))
 
 const DashboardPage = lazy(() => import('../pages/admin/DashboardPage'));
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
@@ -30,6 +32,8 @@ const ReportPage = lazy(() => import('../pages/admin/ReportPage'));
 const RefundListPage = lazy(() => import('../pages/admin/RefundListPage'));
 const UserListPage = lazy(() => import('../pages/admin/UserListPage'));
 const AmenityListPage = lazy(() => import('../pages/admin/AmenityListPage'));
+const PromotionListPage = lazy(() => import('../pages/admin/PromotionListPage'));
+
 
 const UnauthorizedPage = () => {
   const navigate = useNavigate();
@@ -83,6 +87,8 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'about', element: <AboutPage /> },
       { path: 'rooms', element: <RoomListPage /> },
+      { path: '/promotions', element: <PromotionsPage /> },
+      { path: '/contact', element: <ContactPage /> },
       { path: 'room-type/:roomTypeId', element: <RoomDetailPage /> },
       { path: 'booking/:id', element: <BookingPage /> },
       { path: 'payment/:id', element: <PaymentPage /> },
@@ -123,6 +129,22 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute roles={['admin']}>
             <AmenityListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'promotions',
+        element: (
+          <ProtectedRoute roles={['admin']}>
+            <PromotionListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute roles={['admin', 'receptionist']}>
+            <S><ProfilePage /></S>
           </ProtectedRoute>
         ),
       },

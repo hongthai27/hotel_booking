@@ -60,7 +60,7 @@ const ComparePage = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 pb-32">
+    <div className="max-w-5xl mx-auto py-8 px-4 pb-32">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-medium text-gray-800">So sánh hạng phòng</h1>
@@ -161,7 +161,9 @@ const ComparePage = () => {
                     className="px-4 py-2.5 border-l border-gray-100 text-center"
                   >
                     {hasAmenity(room, name) ? (
-                      <span className="text-green-500 text-base">✓</span>
+                      <span className="text-green-500 flex justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                      </span>
                     ) : (
                       <span className="text-gray-200 text-base">—</span>
                     )}

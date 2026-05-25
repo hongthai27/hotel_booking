@@ -1,8 +1,10 @@
 import * as bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import fs from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
+import { UserRole, UserStatus } from '@prisma/client';
 import { generateToken } from '../utils/jwt.util';
 import { RegisterDto, LoginDto } from '../validations/auth.schema';
 import { createAuditLog } from '../utils/audit-log.util';
@@ -122,10 +124,13 @@ export const getAllUsers = async (filter?: {
   status?: string;
   search?: string;
 }) => {
+  const validRole = filter?.role && Object.values(UserRole).includes(filter.role as UserRole) ? (filter.role as UserRole) : undefined;
+  const validStatus = filter?.status && Object.values(UserStatus).includes(filter.status as UserStatus) ? (filter.status as UserStatus) : undefined;
+
   return prisma.user.findMany({
     where: {
-      ...(filter?.role && { role: filter.role as any }),
-      ...(filter?.status && { status: filter.status as any }),
+      ...(validRole && { role: validRole }),
+      ...(validStatus && { status: validStatus }),
       ...(filter?.search && {
         OR: [
           { fullName: { contains: filter.search } },
@@ -152,6 +157,13 @@ export const updateUser = async (
   data: { role?: string; status?: string },
   actorId: number
 ) => {
+  if (data.role && !Object.values(UserRole).includes(data.role as UserRole)) {
+    throw new AppError(400, 'Vai trò không hợp lệ');
+  }
+  if (data.status && !Object.values(UserStatus).includes(data.status as UserStatus)) {
+    throw new AppError(400, 'Trạng thái không hợp lệ');
+  }
+
   const existing = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!existing) {
@@ -166,8 +178,8 @@ export const updateUser = async (
     const updated = await tx.user.update({
       where: { id: userId },
       data: {
-        ...(data.role && { role: data.role as any }),
-        ...(data.status && { status: data.status as any }),
+        ...(data.role && { role: data.role as UserRole }),
+        ...(data.status && { status: data.status as UserStatus }),
       },
       select: {
         id: true,
@@ -271,12 +283,19 @@ export const uploadAvatar = async (
   userId: number,
   file: Express.Multer.File
 ) => {
-  const result = await cloudinary.uploader.upload(file.path, {
-    folder: 'hotel-booking/avatars',
-    transformation: [
-      { width: 200, height: 200, crop: 'fill', gravity: 'face' },
-    ],
-  });
+  let result;
+  try {
+    result = await cloudinary.uploader.upload(file.path, {
+      folder: 'hotel-booking/avatars',
+      transformation: [
+        { width: 200, height: 200, crop: 'fill', gravity: 'face' },
+      ],
+    });
+  } finally {
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+  }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (user?.avatarUrl) {

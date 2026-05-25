@@ -19,7 +19,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: 'available',
+        status: { not: 'maintenance' },
       },
       include: { roomType: true },
     });
@@ -61,7 +61,60 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
       (checkOutDate.getTime() - checkInDate.getTime()) / MS_PER_DAY
     );
 
-    const totalAmount = nights * Number(availableRoom.roomType.basePrice);
+    let totalAmount = nights * Number(availableRoom.roomType.basePrice);
+    let discountAmount = 0;
+    let appliedPromotionId: number | null = null;
+
+    // -- LOGIC ÁP DỤNG MÃ KHUYẾN MÃI TỪ DATABASE --
+    if (data.promoCode) {
+      const code = data.promoCode.toUpperCase().trim();
+      const promo = await tx.promotion.findUnique({
+        where: { code },
+      });
+
+      if (!promo || !promo.isActive) {
+        throw new AppError(400, 'Mã ưu đãi không hợp lệ hoặc đã bị khóa.');
+      }
+
+      const now = new Date();
+      if (now < promo.startDate || now > promo.endDate) {
+        throw new AppError(400, 'Mã ưu đãi đã hết hạn hoặc chưa đến thời gian áp dụng.');
+      }
+
+      if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
+        throw new AppError(400, 'Mã ưu đãi đã hết lượt sử dụng.');
+      }
+
+      if (promo.minNights && nights < promo.minNights) {
+        throw new AppError(400, `Chưa đủ điều kiện: Cần đặt tối thiểu ${promo.minNights} đêm.`);
+      }
+
+      // Kiểm tra mỗi user chỉ được dùng 1 lần với mã này (không tính đơn đã hủy)
+      const hasUsed = await tx.booking.findFirst({
+        where: {
+          userId,
+          promotionId: promo.id,
+          status: { notIn: ['cancelled'] as BookingStatus[] },
+        },
+      });
+
+      if (hasUsed) {
+        throw new AppError(400, 'Bạn đã sử dụng mã ưu đãi này trước đó rồi.');
+      }
+
+      if (promo.type === 'percentage') discountAmount = (totalAmount * promo.value) / 100;
+      else if (promo.type === 'free_night') discountAmount = Number(availableRoom.roomType.basePrice) * promo.value;
+      else if (promo.type === 'fixed') discountAmount = promo.value;
+
+      totalAmount = Math.max(0, totalAmount - discountAmount);
+      appliedPromotionId = promo.id;
+
+      // Cập nhật tăng số lượt sử dụng mã
+      await tx.promotion.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
 
     const booking = await tx.booking.create({
       data: {
@@ -73,7 +126,10 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
         totalAmount,
         source: 'online',
         status: 'pending_payment',
-        specialRequests: data.specialRequests, 
+        specialRequests: data.specialRequests,
+        promoCode: data.promoCode ? data.promoCode.toUpperCase().trim() : null,
+        discountAmount,
+        promotionId: appliedPromotionId,
       },
     });
 
@@ -576,7 +632,7 @@ export const createOfflineBooking = async (
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: 'available',
+        status: { not: 'maintenance' },
       },
       include: { roomType: true },
     });
@@ -590,7 +646,7 @@ export const createOfflineBooking = async (
       const conflict = await tx.booking.findFirst({
         where: {
           roomId: room.id,
-          status: { notIn: ['cancelled'] },
+          status: { notIn: ['cancelled'] as BookingStatus[] },
           AND: [
             { checkInDate: { lt: checkOutDate } },
             { checkOutDate: { gt: checkInDate } },
@@ -609,7 +665,57 @@ export const createOfflineBooking = async (
     }
 
     const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / MS_PER_DAY);
-    const totalAmount = nights * Number(assignedRoom.roomType.basePrice);
+    let totalAmount = nights * Number(assignedRoom.roomType.basePrice);
+    let discountAmount = 0;
+    let appliedPromotionId: number | null = null;
+
+    if (data.promoCode) {
+      const code = data.promoCode.toUpperCase().trim();
+      const promo = await tx.promotion.findUnique({
+        where: { code },
+      });
+
+      if (!promo || !promo.isActive) {
+        throw new AppError(400, 'Mã ưu đãi không hợp lệ hoặc đã bị khóa.');
+      }
+
+      const now = new Date();
+      if (now < promo.startDate || now > promo.endDate) {
+        throw new AppError(400, 'Mã ưu đãi đã hết hạn hoặc chưa đến thời gian áp dụng.');
+      }
+
+      if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
+        throw new AppError(400, 'Mã ưu đãi đã hết lượt sử dụng.');
+      }
+
+      if (promo.minNights && nights < promo.minNights) {
+        throw new AppError(400, `Chưa đủ điều kiện: Cần đặt tối thiểu ${promo.minNights} đêm.`);
+      }
+
+      const hasUsed = await tx.booking.findFirst({
+        where: {
+          userId: finalUserId,
+          promotionId: promo.id,
+          status: { notIn: ['cancelled'] as BookingStatus[] },
+        },
+      });
+
+      if (hasUsed) {
+        throw new AppError(400, 'Khách hàng đã sử dụng mã ưu đãi này trước đó rồi.');
+      }
+
+      if (promo.type === 'percentage') discountAmount = (totalAmount * promo.value) / 100;
+      else if (promo.type === 'free_night') discountAmount = Number(assignedRoom.roomType.basePrice) * promo.value;
+      else if (promo.type === 'fixed') discountAmount = promo.value;
+
+      totalAmount = Math.max(0, totalAmount - discountAmount);
+      appliedPromotionId = promo.id;
+
+      await tx.promotion.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
 
     const booking = await tx.booking.create({
       data: {
@@ -623,6 +729,9 @@ export const createOfflineBooking = async (
         source: 'offline',
         status: 'confirmed',
         paidAt: new Date(),
+        promoCode: data.promoCode ? data.promoCode.toUpperCase().trim() : null,
+        discountAmount,
+        promotionId: appliedPromotionId,
       },
     });
 
@@ -723,7 +832,8 @@ export const updateOfflineBooking = async (
         (checkOutDate.getTime() - checkInDate.getTime()) / MS_PER_DAY
       );
 
-      totalAmount = nights * Number(room.roomType.basePrice);
+      const newBaseTotal = nights * Number(room.roomType.basePrice);
+      totalAmount = Math.max(0, newBaseTotal - Number(booking.discountAmount));
     }
 
     const oldBooking = { ...booking };

@@ -39,6 +39,7 @@ export const createBookingSchema = z
     checkOutDate: z.string().min(1, 'Vui lòng chọn ngày trả phòng'),
     guestCount: z.coerce.number().int().min(1).max(MAX_GUESTS),
     specialRequests: z.string().max(500).optional(),
+    promoCode: z.string().optional(),
   })
   .refine(
     (d) => new Date(d.checkOutDate) > new Date(d.checkInDate),
@@ -74,6 +75,7 @@ export const createOfflineBookingSchema = z
       required_error: 'Phương thức thanh toán là bắt buộc',
       invalid_type_error: 'Phương thức thanh toán không hợp lệ',
     }),
+    promoCode: z.string().optional(),
   })
   .refine(
     (d) => new Date(d.checkOutDate) > new Date(d.checkInDate),
