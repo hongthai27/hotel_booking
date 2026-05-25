@@ -162,16 +162,14 @@ export const simulateSuccess = async (transactionRef: string) => {
     // Fire and forget - Không block luồng response
     sendBookingConfirmationEmail(
       {
-        id: booking.id,
-        checkInDate: booking.checkInDate,
-        checkOutDate: booking.checkOutDate,
+        ...booking,
+        // Truyền đích danh tên hạng phòng và số phòng ra ngoài để template Email dễ đọc
+        roomName: booking.room.roomType.typeName,
+        roomTypeName: booking.room.roomType.typeName,
+        roomNumber: booking.room.roomNumber,
         totalAmount: Number(booking.totalAmount),
-        roomId: booking.roomId,
-      },
-      {
-        fullName: booking.customer.fullName,
-        email: booking.customer.email,
-      }
+      } as any,
+      booking.customer
     );
   }
 
