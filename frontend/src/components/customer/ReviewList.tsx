@@ -28,7 +28,9 @@ export const ReviewList: React.FC<ReviewListProps> = ({ roomTypeId }) => {
     );
   }
 
-  const reviews: any[] = Array.isArray(data) ? data : ((data as any)?.data || []);
+  const reviews: any[] = Array.isArray(data) 
+    ? data 
+    : ((data as any)?.reviews || (data as any)?.data || []);
 
   const average =
     reviews.length > 0

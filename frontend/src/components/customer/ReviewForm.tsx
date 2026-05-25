@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../../services/api';
 
@@ -12,12 +12,14 @@ const ReviewForm = ({ bookingId, onSuccess }: ReviewFormProps) => {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState('');
+  const queryClient = useQueryClient();
 
   const { mutate: submitReview, isPending } = useMutation({
     mutationFn: () =>
-      api.post('/reviews', { bookingId, rating, comment }),
+      api.post(`/bookings/${bookingId}/review`, { rating, comment }),
     onSuccess: () => {
       toast.success('Cảm ơn bạn đã đánh giá!');
+      queryClient.invalidateQueries(); // Xóa toàn bộ cache để các trang tự cập nhật
       onSuccess?.();
     },
     onError: (err: any) => {
