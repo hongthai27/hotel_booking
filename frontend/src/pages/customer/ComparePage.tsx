@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useCompareStore } from '../../stores/compareStore';
+import { useSearchStore } from '../../stores/searchStore';
 
 const PLACEHOLDER = 'https://placehold.co/400x250?text=Room';
 
@@ -8,6 +9,7 @@ const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
 const ComparePage = () => {
   const { items, clear } = useCompareStore();
   const navigate = useNavigate();
+  const { checkIn, checkOut, guests } = useSearchStore();
 
   if (items.length < 2) {
     return (
@@ -27,16 +29,24 @@ const ComparePage = () => {
 
   const [r1, r2] = items;
 
+  const handleBookClick = (roomId: number) => {
+    if (checkIn && checkOut) {
+      navigate(`/room-type/${roomId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`);
+    } else {
+      navigate(`/room-type/${roomId}`);
+    }
+  };
+
   // Gộp tất cả amenities từ 2 phòng
   const allAmenities = Array.from(
     new Set([
-      ...(r1.amenities?.map((a) => a.amenityName) ?? []),
-      ...(r2.amenities?.map((a) => a.amenityName) ?? []),
+      ...(r1.amenities?.map((a: any) => a.amenity?.amenityName || a.amenityName).filter(Boolean) ?? []),
+      ...(r2.amenities?.map((a: any) => a.amenity?.amenityName || a.amenityName).filter(Boolean) ?? []),
     ])
   );
 
   const hasAmenity = (room: typeof r1, name: string) =>
-    room.amenities?.some((a) => a.amenityName === name) ?? false;
+    room.amenities?.some((a: any) => (a.amenity?.amenityName || a.amenityName) === name) ?? false;
 
   const rows = [
     {
@@ -52,10 +62,16 @@ const ComparePage = () => {
       highlight: false,
     },
     {
-      label: 'Số ảnh',
-      v1: `${r1.images?.length ?? 0} ảnh`,
-      v2: `${r2.images?.length ?? 0} ảnh`,
+      label: 'Diện tích (ước tính)',
+      v1: r1.maxCapacity <= 2 ? '25m²' : r1.maxCapacity === 3 ? '35m²' : '50m²',
+      v2: r2.maxCapacity <= 2 ? '25m²' : r2.maxCapacity === 3 ? '35m²' : '50m²',
       highlight: false,
+    },
+    {
+      label: 'Giá trung bình / khách',
+      v1: formatVND(Math.round(Number(r1.basePrice) / r1.maxCapacity)),
+      v2: formatVND(Math.round(Number(r2.basePrice) / r2.maxCapacity)),
+      highlight: true,
     },
   ];
 
@@ -82,7 +98,7 @@ const ComparePage = () => {
             </span>
           </div>
           {[r1, r2].map((room) => (
-            <div key={room.id} className="border-l border-gray-100">
+          <div key={room.id} className="border-l border-gray-100 relative">
               <img
                 src={room.images?.[0]?.imageUrl ?? PLACEHOLDER}
                 alt={room.typeName}
@@ -91,6 +107,20 @@ const ComparePage = () => {
                   (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
                 }}
               />
+            
+            {/* Badge phòng trống */}
+            {room.availableRoomCount !== undefined && (
+              <span className={`absolute top-2 right-2 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm ${
+                room.availableRoomCount > 0
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-red-50 text-red-600'
+              }`}>
+                {room.availableRoomCount > 0
+                  ? `Còn ${room.availableRoomCount} phòng`
+                  : 'Hết phòng'}
+              </span>
+            )}
+
               <div className="p-4">
                 <h2 className="font-medium text-gray-800 mb-1">{room.typeName}</h2>
                 {room.description && (
@@ -99,10 +129,10 @@ const ComparePage = () => {
                   </p>
                 )}
                 <button
-                  onClick={() => navigate(`/rooms/${room.id}`)}
+                onClick={() => handleBookClick(room.id)}
                   className="mt-3 w-full bg-primary text-white text-xs font-medium py-2 rounded-xl hover:bg-primary-dark transition-colors"
                 >
-                  Đặt phòng này →
+                Xem chi tiết & Đặt phòng →
                 </button>
               </div>
             </div>

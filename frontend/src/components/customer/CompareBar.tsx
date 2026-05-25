@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCompareStore } from '../../stores/compareStore';
 
 const PLACEHOLDER = 'https://placehold.co/60x60?text=Room';
@@ -7,9 +7,13 @@ const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
 
 const CompareBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { items, remove, clear } = useCompareStore();
 
   if (items.length === 0) return null;
+
+  // Chỉ hiển thị thanh so sánh ở trang danh sách phòng
+  if (location.pathname !== '/rooms') return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg px-6 py-4">
