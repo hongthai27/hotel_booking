@@ -60,7 +60,7 @@ const RefundListPage = () => {
     <div className="flex flex-col gap-6">
       <h2 className="text-lg font-medium text-gray-800">Quản lý hoàn tiền</h2>
 
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col gap-1 w-fit">
+      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col gap-1 w-full sm:w-fit">
         <span className="text-xs text-gray-400">Tổng tiền đã hoàn</span>
         <p className="text-2xl font-semibold text-red-500">
           {formatVND(totalRefunded)}
@@ -72,11 +72,11 @@ const RefundListPage = () => {
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['Mã GD', 'Khách hàng', 'Phòng', 'Số tiền hoàn', 'Ngày hoàn', 'Mã đơn', 'Trạng thái'].map((col) => (
-                  <th key={col} className="text-left px-4 py-3 text-xs font-medium text-gray-500">
+                  <th key={col} className="text-left px-4 py-3 text-xs font-medium text-gray-500 whitespace-nowrap">
                     {col}
                   </th>
                 ))}
@@ -101,36 +101,38 @@ const RefundListPage = () => {
 
               {!isLoading && refunds?.map((refund) => (
                 <tr key={refund.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                  <td className="px-4 py-3 text-gray-500 text-xs font-mono whitespace-nowrap">
                     {refund.transactionRef ?? '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-gray-800">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <p className="text-sm font-medium text-gray-800 truncate max-w-[150px]" title={refund.booking?.customer?.fullName}>
                       {refund.booking?.customer?.fullName ?? '—'}
                     </p>
                     <p className="text-xs text-gray-400">
                       {refund.booking?.customer?.phoneNumber}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-sm">
-                    {refund.booking?.room?.roomType?.typeName ?? '—'}
+                  <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">
+                    <span className="truncate max-w-[150px] inline-block align-bottom" title={refund.booking?.room?.roomType?.typeName}>
+                      {refund.booking?.room?.roomType?.typeName ?? '—'}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-red-500 font-medium text-sm">
+                  <td className="px-4 py-3 text-red-500 font-medium text-sm whitespace-nowrap">
                     {formatVND(Number(refund.amount))}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-sm">
+                  <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">
                     {refund.refundedAt ? formatDate(refund.refundedAt) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-sm">
+                  <td className="px-4 py-3 text-gray-500 text-sm whitespace-nowrap">
                     #{refund.bookingId}
                   </td>
                   
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     {/* Nút chỉ hiện khi trạng thái là pending_refund */}
                     {refund.status === 'pending_refund' && (
                       <div className="flex flex-col gap-2">
                         <div className="text-xs text-yellow-700 bg-yellow-50 px-2.5 py-1 rounded-full border border-yellow-200 w-fit">
-                          Đang xử lý ({formatVND(Number(refund.amount))})
+                          Đang xử lý
                         </div>
                         <button
                           onClick={() => handleConfirmRefund(refund.id)}
@@ -145,7 +147,7 @@ const RefundListPage = () => {
                     {/* Huy hiệu chỉ hiện khi trạng thái là refunded */}
                     {refund.status === 'refunded' && (
                       <div className="text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 w-fit">
-                        Đã hoàn tiền ({formatVND(Number(refund.amount))})
+                        Đã hoàn tiền
                       </div>
                     )}
                   </td>

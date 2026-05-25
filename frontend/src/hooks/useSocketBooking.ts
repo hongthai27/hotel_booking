@@ -22,6 +22,11 @@ export const useSocketAllBookings = (bookingIds: number[] = []): void => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Đảm bảo Socket luôn được mở khi Khách hàng truy cập trang
+    if (!socketService.socket.connected) {
+      socketService.connect('customer');
+    }
+
     // Join vào tất cả các room đang hiện trên màn hình (dành cho User)
     bookingIds.forEach((id) => {
       if (id) socketService.joinBooking(id);
@@ -48,6 +53,11 @@ export const useSocketBooking = (bookingId: number): void => {
 
   useEffect(() => {
     if (!bookingId) return;
+
+    // Đảm bảo Socket luôn được mở khi Khách hàng truy cập trang
+    if (!socketService.socket.connected) {
+      socketService.connect('customer');
+    }
 
     socketService.joinBooking(bookingId);
 

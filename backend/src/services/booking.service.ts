@@ -497,6 +497,15 @@ export const checkIn = async (
     throw new AppError(400, `Không thể check-in đơn ở trạng thái ${booking.status}`);
   }
 
+  // Chỉ cho phép check-in vào đúng ngày (hoặc sau ngày) nhận phòng
+  const now = new Date();
+  const checkInDay = new Date(booking.checkInDate);
+  checkInDay.setHours(0, 0, 0, 0); // Lấy mốc 0h sáng của ngày check-in
+
+  if (now.getTime() < checkInDay.getTime()) {
+    throw new AppError(400, 'Chưa đến ngày nhận phòng. Không thể thao tác check-in sớm!');
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({
       where: { id: bookingId },

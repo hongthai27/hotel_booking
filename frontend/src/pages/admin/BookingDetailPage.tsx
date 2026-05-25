@@ -221,9 +221,9 @@ const BookingDetailPage = () => {
     }
   });
 
-  // Tìm lệnh hoàn tiền đang bị chờ (pending refund)
-  const pendingRefund = booking?.payments?.find(
-    (p: any) => p.feeType === 'refund' && p.status === 'pending'
+  // Tìm lệnh hoàn tiền
+  const refundPayment = booking?.payments?.find(
+    (p: any) => p.feeType === 'refund'
   );
 
   // LOGIC MỚI: Lấy đúng giao dịch thanh toán gốc
@@ -238,7 +238,7 @@ const BookingDetailPage = () => {
       const isRefunded = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'refunded');
       if (isRefunded) return { label: 'Đã hoàn tiền', color: 'bg-gray-100 text-gray-600' };
       
-      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending');
+      const isPendingRefund = booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending_refund');
       if (isPendingRefund) return { label: 'Chờ hoàn tiền', color: 'bg-orange-100 text-orange-700' };
       
       return { label: 'Đã hủy', color: 'bg-gray-100 text-gray-500' };
@@ -370,7 +370,7 @@ const BookingDetailPage = () => {
                 )}
 
                 {/* Xác nhận hoàn tiền */}
-                {pendingRefund && (
+                {refundPayment?.status === 'pending_refund' && (
                   <button
                     onClick={() => {
                       if (window.confirm('Bạn xác nhận đã hoàn tiền cho khách hàng này?')) {
@@ -480,13 +480,13 @@ const BookingDetailPage = () => {
                   <span className="text-xl font-bold text-primary">{formatVND(booking.totalPrice)}</span>
                 </div>
                 
-                {/* HIỂN THỊ TIỀN CHỜ HOÀN NẾU CÓ */}
-                {pendingRefund && (
+                {/* HIỂN THỊ TIỀN HOÀN LẠI NẾU CÓ */}
+                {refundPayment && (
                   <>
                     <div className="h-px bg-gray-200 w-full my-2"></div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-orange-600">Cần hoàn tiền (Chờ duyệt)</span>
-                      <span className="text-lg font-bold text-orange-600">{formatVND(Number(pendingRefund.amount))}</span>
+                      <span className={`text-sm font-medium ${refundPayment.status === 'refunded' ? 'text-green-600' : 'text-orange-600'}`}>Số tiền hoàn lại {refundPayment.status === 'refunded' ? '(Đã hoàn)' : '(Chờ duyệt)'}</span>
+                      <span className={`text-lg font-bold ${refundPayment.status === 'refunded' ? 'text-green-600' : 'text-orange-600'}`}>{formatVND(Number(refundPayment.amount))}</span>
                     </div>
                   </>
                 )}

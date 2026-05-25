@@ -77,6 +77,7 @@ const CustomerBookingDetailPage = () => {
   const discountAmount = Number((booking as any).discountAmount) || 0;
   const promoCode = (booking as any).promoCode;
   const bookingSource = (booking as any).source || 'online';
+  const refundPaymentInfo = booking.payments?.find((p: any) => p.feeType === 'refund');
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
@@ -201,6 +202,17 @@ const CustomerBookingDetailPage = () => {
               </span>
             </div>
           </div>
+
+          {booking.status === 'cancelled' && refundPaymentInfo && (
+            <div className="border-t border-gray-100 pt-3 flex justify-between items-center mt-3">
+              <span className={`text-sm font-medium ${refundPaymentInfo.status === 'refunded' ? 'text-green-600' : 'text-orange-600'}`}>
+                Số tiền hoàn lại {refundPaymentInfo.status === 'refunded' ? '(Đã hoàn)' : ''}
+              </span>
+              <span className={`text-lg font-medium ${refundPaymentInfo.status === 'refunded' ? 'text-green-600' : 'text-orange-600'}`}>
+                {formatVND(Number(refundPaymentInfo.amount))}
+              </span>
+            </div>
+          )}
 
           {booking.status === 'cancelled' && booking.payments?.some((p: any) => p.feeType === 'refund' && p.status === 'pending_refund') && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700 mt-2">

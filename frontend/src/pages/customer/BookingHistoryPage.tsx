@@ -41,7 +41,7 @@ const BookingCard = ({
       if (refundPayment?.status === 'refunded') {
         return (
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-            Đã hoàn tiền ({formatVND(Number(refundPayment.amount))})
+            Đã hoàn tiền
           </span>
         );
       }
@@ -49,7 +49,7 @@ const BookingCard = ({
       if (refundPayment?.status === 'pending_refund') {
         return (
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
-            Chờ hoàn tiền ({formatVND(Number(refundPayment.amount))})
+            Chờ hoàn tiền
           </span>
         );
       }
