@@ -57,6 +57,17 @@ export const getAllPromotions = catchAsync(async (req: Request, res: Response) =
   successResponse(res, promotions, 'Lấy danh sách ưu đãi thành công');
 });
 
+export const getPublicPromotions = catchAsync(async (req: Request, res: Response) => {
+  const promotions = await prisma.promotion.findMany({
+    where: {
+      isActive: true,
+      endDate: { gte: new Date() }, // Chỉ lấy các mã chưa quá hạn
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  successResponse(res, promotions, 'Lấy danh sách ưu đãi công khai thành công');
+});
+
 export const createPromotion = catchAsync(async (req: Request, res: Response) => {
   const data = req.body;
   

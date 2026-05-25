@@ -26,10 +26,21 @@ const PromotionListPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const { data: promotions, isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['admin', 'promotions'],
-    queryFn: () => api.get<{ data: any[] }>('/promotions').then((r) => r.data.data),
+    queryFn: () => api.get('/promotions').then((r) => r.data),
   });
+
+  const extractData = () => {
+    if (!rawData) return [];
+    if (Array.isArray(rawData)) return rawData;
+    if (Array.isArray(rawData.data)) return rawData.data;
+    if (Array.isArray(rawData.promotions)) return rawData.promotions;
+    if (Array.isArray(rawData.data?.promotions)) return rawData.data.promotions;
+    return [];
+  };
+
+  const promotions = extractData();
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(promotionSchema),
@@ -43,6 +54,7 @@ const PromotionListPage = () => {
     mutationFn: (data: any) => api.post('/promotions', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'promotions'] });
+      queryClient.invalidateQueries({ queryKey: ['public', 'promotions'] });
       toast.success('Tạo mã ưu đãi thành công');
       handleCloseModal();
     },
@@ -53,6 +65,7 @@ const PromotionListPage = () => {
     mutationFn: ({ id, data }: { id: number, data: any }) => api.put(`/promotions/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'promotions'] });
+      queryClient.invalidateQueries({ queryKey: ['public', 'promotions'] });
       toast.success('Cập nhật mã ưu đãi thành công');
       handleCloseModal();
     },
@@ -63,6 +76,7 @@ const PromotionListPage = () => {
     mutationFn: (id: number) => api.patch(`/promotions/${id}/toggle`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'promotions'] });
+      queryClient.invalidateQueries({ queryKey: ['public', 'promotions'] });
       toast.success('Thay đổi trạng thái thành công');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra'),
@@ -72,6 +86,7 @@ const PromotionListPage = () => {
     mutationFn: (id: number) => api.delete(`/promotions/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'promotions'] });
+      queryClient.invalidateQueries({ queryKey: ['public', 'promotions'] });
       toast.success('Xóa mã ưu đãi thành công');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra'),
@@ -85,8 +100,8 @@ const PromotionListPage = () => {
       setValue('value', promo.value);
       setValue('minNights', promo.minNights || 0);
       setValue('usageLimit', promo.usageLimit || 0);
-      setValue('startDate', promo.startDate.split('T')[0]);
-      setValue('endDate', promo.endDate.split('T')[0]);
+      setValue('startDate', promo.startDate?.split('T')[0] || '');
+      setValue('endDate', promo.endDate?.split('T')[0] || '');
       setValue('isActive', promo.isActive);
     } else {
       setEditingId(null);
@@ -163,8 +178,8 @@ const PromotionListPage = () => {
                     {promo.minNights ? <span className="text-xs text-gray-400">Đk: Tối thiểu {promo.minNights} đêm</span> : ''}
                   </td>
                   <td className="px-4 py-4 text-gray-600">
-                    <span className="block mb-0.5">Từ: {formatDate(promo.startDate).split(' ')[0]}</span>
-                    <span className="block text-red-500">Đến: {formatDate(promo.endDate).split(' ')[0]}</span>
+                    <span className="block mb-0.5">Từ: {promo.startDate ? formatDate(promo.startDate).split(' ')[0] : '—'}</span>
+                    <span className="block text-red-500">Đến: {promo.endDate ? formatDate(promo.endDate).split(' ')[0] : '—'}</span>
                   </td>
                   <td className="px-4 py-4 text-center text-gray-600 font-medium">
                     {promo.usedCount} <span className="text-gray-400 font-normal">/ {promo.usageLimit || '∞'}</span>

@@ -6,6 +6,9 @@ import { createPromotionSchema, updatePromotionSchema } from '../validations/pro
 
 const router = Router();
 
+// Route: GET /promotions/public (Lấy danh sách mã ưu đãi cho Khách hàng)
+router.get('/public', promotionController.getPublicPromotions);
+
 // Route: GET /promotions/validate?code=XYZ
 router.get('/validate', promotionController.validatePromotion);
 
