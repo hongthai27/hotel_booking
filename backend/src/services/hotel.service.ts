@@ -577,6 +577,8 @@ export interface RoomGuestOverview {
   checkInDate: Date;
   checkOutDate: Date;
   guestCount: number;
+  isUpcoming?: boolean;
+  isOverdue?: boolean;
 }
 
 export interface RoomOverview {
@@ -588,6 +590,7 @@ export interface RoomOverview {
   typeName: string;
   maxCapacity: number;
   currentGuest: RoomGuestOverview | null;
+  version: number;
 }
 
 /**
@@ -611,9 +614,14 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
         },
         bookings: {
           where: {
-            status: { in: ACTIVE_BOOKING_STATUSES },
-            checkInDate: { lte: todayEnd },
-            checkOutDate: { gt: todayStart },
+            OR: [
+              { status: 'checked_in' },
+              {
+                status: 'confirmed',
+                checkInDate: { lte: todayEnd },
+                checkOutDate: { gt: todayStart },
+              }
+            ]
           },
           select: {
             id: true,
@@ -630,42 +638,59 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
     });
 
     return rooms.map((room) => {
-      // 1. Khách ĐANG Ở thực tế: Bắt buộc trạng thái đơn phải là 'checked_in'
-      const activeBooking = room.bookings.find((b) => b.status === 'checked_in');
+      let finalStatus = room.status;
+      let guestInfo: RoomGuestOverview | null = null;
 
-      // 2. Khách SẮP ĐẾN hôm nay: Đơn mới ở trạng thái 'confirmed' (chưa check-in)
+      // 1. Khách ĐANG Ở thực tế: Trạng thái đơn phải là 'checked_in'
+      let activeBooking = room.bookings.find((b) => b.status === 'checked_in');
+
+      // NẾU phòng đang hiện 'occupied' nhưng hệ thống không có đơn 'checked_in',
+      // rất có thể lễ tân đã đổi trạng thái phòng mà quên bấm Check-in đơn.
+      // -> Tự động tìm đơn 'confirmed' hợp lệ trong khoảng thời gian này để lấp vào!
+      if (!activeBooking && room.status === 'occupied') {
+        activeBooking = room.bookings.find(
+          (b) => b.status === 'confirmed' && 
+                 new Date(b.checkInDate) <= todayEnd && 
+                 new Date(b.checkOutDate) >= todayStart
+        );
+      }
+
+      // 2. Khách SẮP ĐẾN hôm nay: Đơn ở trạng thái 'confirmed' (chưa check-in) và loại trừ đơn đã map ở trên
       const upcomingBooking = room.bookings.find(
         (b) => b.status === 'confirmed' && 
                new Date(b.checkInDate) >= todayStart && 
-               new Date(b.checkInDate) <= todayEnd
+               new Date(b.checkInDate) <= todayEnd &&
+               b.id !== activeBooking?.id
       );
-      let finalStatus = room.status;
-      let guestInfo = null;
 
       if (activeBooking) {
-        // Nếu có khách đang ở -> Hiện màu Xanh dương
-        finalStatus = 'occupied'; 
+        finalStatus = room.status === 'available' ? ('occupied' as any) : room.status; 
+        
+        // Kiểm tra xem đã quá hạn Check-out chưa (ví dụ lố qua 12:00 trưa)
+        const isOverdue = now > new Date(activeBooking.checkOutDate);
+
         guestInfo = {
           bookingId: activeBooking.id,
-          guestName: activeBooking.customer.fullName,
-          guestPhone: activeBooking.customer.phoneNumber,
+          guestName: activeBooking.customer?.fullName ?? 'Khách',
+          guestPhone: activeBooking.customer?.phoneNumber ?? '—',
           checkInDate: activeBooking.checkInDate,
           checkOutDate: activeBooking.checkOutDate,
           guestCount: activeBooking.guestCount,
           isUpcoming: false,
+          isOverdue,
         };
         
       } else if (upcomingBooking && room.status === 'available') {
-        // Nếu phòng trống SẠCH VÀ có khách sắp đến chiều nay -> Kích hoạt màu Cam tự động!
         finalStatus = 'reserved' as any;
         guestInfo = {
           bookingId: upcomingBooking.id,
-          guestName: upcomingBooking.customer.fullName,
-          guestPhone: upcomingBooking.customer.phoneNumber,
+          guestName: upcomingBooking.customer?.fullName ?? 'Khách',
+          guestPhone: upcomingBooking.customer?.phoneNumber ?? '—',
           checkInDate: upcomingBooking.checkInDate,
           checkOutDate: upcomingBooking.checkOutDate,
           guestCount: upcomingBooking.guestCount,
-          isUpcoming: true, // Gắn cờ để Frontend hiển thị nhãn "Khách sắp đến"
+          isUpcoming: true,
+          isOverdue: false,
         };
       }
 
@@ -678,6 +703,7 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
         typeName: room.roomType.typeName,
         maxCapacity: room.roomType.maxCapacity,
         currentGuest: guestInfo,
+        version: room.version,
       };
     });
   } catch (error: any) {

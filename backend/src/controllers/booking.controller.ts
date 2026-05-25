@@ -93,7 +93,8 @@ export const checkOut = catchAsync(async (req: Request, res: Response) => {
   const result = await bookingService.checkOut(
     Number(req.params.id),
     req.user!.userId,
-    req.body.extraCharges ?? []
+    req.body.extraCharges ?? [],
+    req.body.paymentMethod
   );
   successResponse(res, result, 'Check-out thành công');
 });

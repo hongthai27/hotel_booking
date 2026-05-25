@@ -344,7 +344,7 @@ const BookingDetailPage = () => {
                   <button
                     onClick={() => {
                       if (window.confirm('Xác nhận Check-in cho khách hàng này?')) {
-                        checkIn(booking.id);
+                        checkIn({ id: booking.id });
                       }
                     }}
                     disabled={isCheckingIn}
@@ -359,7 +359,7 @@ const BookingDetailPage = () => {
                   <button
                     onClick={() => {
                       if (window.confirm('Xác nhận Check-out cho khách hàng này?')) {
-                        checkOut(booking.id);
+                        checkOut({ id: booking.id, extraCharges: [] });
                       }
                     }}
                     disabled={isCheckingOut}

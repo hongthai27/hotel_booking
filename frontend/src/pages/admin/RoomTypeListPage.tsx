@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useCreateRoomType, useUpdateRoomType, useUpdateRoomStatus } from '../../hooks/mutations/useRoomTypeMutation';
+import { useCreateRoomType, useUpdateRoomType } from '../../hooks/mutations/useRoomTypeMutation';
 import { useAdminRoomTypes } from '../../hooks/queries/useAdminBookingsQuery';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../../services/api';
+import { toast } from 'sonner';
 
 const PLACEHOLDER = 'https://placehold.co/400x300?text=No+Image';
 
@@ -333,9 +336,21 @@ const RoomTypeListPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [expandedRoomTypeId, setExpandedRoomTypeId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: roomTypes, isLoading } = useAdminRoomTypes();
-  const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateRoomStatus();
+  
+  const { mutate: updateStatus, isPending: isUpdatingStatus } = useMutation({
+    mutationFn: ({ id, status, version }: { id: number; status: string; version: number }) => 
+      api.patch(`/admin/rooms/${id}/status`, { status, version }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      toast.success('Cập nhật trạng thái phòng thành công');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật'),
+  });
 
   const toggleExpand = (id: number) => {
     setExpandedRoomTypeId(prev => (prev === id ? null : id));
@@ -489,7 +504,7 @@ const RoomTypeListPage = () => {
                                   <select
                                     value={room.status}
                                     disabled={isUpdatingStatus}
-                                    onChange={(e) => updateStatus({ id: room.id, status: e.target.value })}
+                                    onChange={(e) => updateStatus({ id: room.id, status: e.target.value, version: room.version })}
                                     className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 cursor-pointer"
                                   >
                                     <option value="available">Trống</option>

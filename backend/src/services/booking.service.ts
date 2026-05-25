@@ -489,6 +489,7 @@ export const checkIn = async (
 ) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
+    include: { room: true },
   });
 
   if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
@@ -506,18 +507,89 @@ export const checkIn = async (
     throw new AppError(400, 'Chưa đến ngày nhận phòng. Không thể thao tác check-in sớm!');
   }
 
+  let finalRoomId = booking.roomId;
+  let isReassigned = false;
+  let newRoomNumber = '';
+
+  // Kiểm tra xem phòng đã thực sự trống và sẵn sàng chưa
+  if (booking.room.status !== 'available') {
+    // 1. Tự động tìm phòng trống khác cùng hạng
+    const availableRooms = await prisma.room.findMany({
+      where: {
+        roomTypeId: booking.room.roomTypeId,
+        status: 'available',
+        id: { not: booking.roomId }
+      }
+    });
+
+    let substituteRoom = null;
+    for (const r of availableRooms) {
+      const conflict = await prisma.booking.findFirst({
+        where: {
+          roomId: r.id,
+          status: { notIn: ['cancelled'] },
+          AND: [
+            { checkInDate: { lt: booking.checkOutDate } },
+            { checkOutDate: { gt: booking.checkInDate } },
+          ],
+        },
+      });
+      if (!conflict) {
+        substituteRoom = r;
+        break;
+      }
+    }
+
+    if (substituteRoom) {
+      finalRoomId = substituteRoom.id;
+      newRoomNumber = substituteRoom.roomNumber;
+      isReassigned = true;
+    } else {
+      let statusText = '';
+      switch (booking.room.status) {
+        case 'occupied': statusText = 'đang có khách ở (khách cũ chưa check-out)'; break;
+        case 'cleaning': statusText = 'đang dọn dẹp chưa xong'; break;
+        case 'maintenance': statusText = 'đang bảo trì'; break;
+        default: statusText = booking.room.status;
+      }
+      throw new AppError(400, `Phòng ${booking.room.roomNumber} hiện chưa sẵn sàng (${statusText}) và không còn phòng trống tương đương để đổi. Vui lòng hoàn tất check-out, dọn phòng hoặc đổi hạng phòng khác.`);
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
+    if (isReassigned) {
+      await tx.$executeRaw`SELECT room_id FROM room WHERE room_id = ${finalRoomId} FOR UPDATE`;
+
+      const conflict = await tx.booking.findFirst({
+        where: {
+          roomId: finalRoomId,
+          status: { notIn: ['cancelled'] },
+          AND: [
+            { checkInDate: { lt: booking.checkOutDate } },
+            { checkOutDate: { gt: booking.checkInDate } },
+          ],
+        },
+      });
+
+      const currentRoomStatus = await tx.room.findUnique({ where: { id: finalRoomId } });
+
+      if (conflict || currentRoomStatus?.status !== 'available') {
+        throw new AppError(409, 'Phòng được tự động chọn vừa bị thay đổi trạng thái. Vui lòng thử lại.');
+      }
+    }
+
     await tx.booking.update({
       where: { id: bookingId },
       data: {
         status: 'checked_in',
+        ...(isReassigned && { roomId: finalRoomId }),
         ...(data.idNumber && { idNumber: data.idNumber }),
         ...(data.checkinNote && { checkinNote: data.checkinNote }),
       },
     });
 
     await tx.room.update({
-      where: { id: booking.roomId },
+      where: { id: finalRoomId },
       data: { status: 'occupied' },
     });
 
@@ -527,16 +599,21 @@ export const checkIn = async (
       targetTable: 'Booking',
       targetId: bookingId,
       action: 'UPDATE',
-      oldValue: { status: booking.status },
-      newValue: { status: 'checked_in', idNumber: data.idNumber },
+      oldValue: { status: booking.status, roomId: booking.roomId },
+      newValue: { status: 'checked_in', idNumber: data.idNumber, ...(isReassigned && { roomId: finalRoomId }) },
     });
   });
 
   emitBookingUpdate(bookingId, {
     status: 'checked_in',
-    roomId: booking.roomId,
+    roomId: finalRoomId,
     roomStatus: 'occupied',
+    ...(isReassigned && { message: `Đã tự động đổi sang phòng ${newRoomNumber}` })
   });
+
+  if (isReassigned) {
+    return { message: `Phòng ${booking.room.roomNumber} chưa sẵn sàng. Hệ thống đã tự động chuyển sang phòng ${newRoomNumber} và Check-in thành công.` };
+  }
 
   return { message: 'Check-in thành công' };
 };
@@ -544,16 +621,43 @@ export const checkIn = async (
 export const checkOut = async (
   bookingId: number,
   staffId: number,
-  extraCharges: { label: string; amount: number }[]
+  extraCharges: { label: string; amount: number }[],
+  paymentMethod: string = 'cash'
 ) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
+    include: {
+      room: { include: { roomType: true } },
+    },
   });
 
   if (!booking) throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
 
   if (booking.status !== 'checked_in') {
     throw new AppError(400, `Không thể check-out đơn ở trạng thái ${booking.status}`);
+  }
+
+  // --- THÊM LOGIC TỰ ĐỘNG TÍNH PHỤ THU QUÁ GIỜ ---
+  const now = new Date();
+  const checkOutDate = new Date(booking.checkOutDate);
+  
+  if (now > checkOutDate) {
+    const diffMs = now.getTime() - checkOutDate.getTime();
+    const overstayHours = Math.ceil(diffMs / (1000 * 60 * 60)); // Làm tròn lên số giờ (VD: lố 1h15p tính là 2h)
+    
+    const basePrice = Number(booking.room.roomType.basePrice);
+    const hourlyRate = basePrice * 0.1; // Phạt 10% giá phòng cho mỗi giờ
+    const overstayFee = Math.min(overstayHours * hourlyRate, basePrice); // Tối đa 100% (1 ngày)
+
+    // Kiểm tra xem lễ tân đã tự thêm phí quá giờ vào form chưa (tránh tính trùng)
+    const alreadyHasLateFee = extraCharges.some(c => c.label.toLowerCase().includes('quá giờ') || c.label.toLowerCase().includes('trễ'));
+    
+    if (overstayFee > 0 && !alreadyHasLateFee) {
+      extraCharges.push({
+        label: `Phụ thu quá giờ (${overstayHours} giờ)`,
+        amount: overstayFee
+      });
+    }
   }
 
   const extraTotal = extraCharges.reduce((sum, c) => sum + c.amount, 0);
@@ -579,7 +683,7 @@ export const checkOut = async (
         data: {
           bookingId,
           amount: extraTotal,
-          method: 'cash',
+          method: paymentMethod as any,
           status: 'success',
           feeType: 'booking',
           paidAt: new Date(),
@@ -1037,4 +1141,44 @@ export const getAllRoomTypesPublic = async () => {
     },
     orderBy: { basePrice: 'asc' },
   });
+};
+
+export const getCheckOutPreview = async (bookingId: number) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      room: {
+        include: { roomType: true },
+      },
+      customer: true,
+    },
+  });
+
+  if (!booking) {
+    throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
+  }
+
+  const now = new Date();
+  const checkOutDate = new Date(booking.checkOutDate);
+  let overstayHours = 0;
+  let overstayFee = 0;
+
+  if (now > checkOutDate) {
+    const diffMs = now.getTime() - checkOutDate.getTime();
+    overstayHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    const basePrice = Number(booking.room.roomType.basePrice);
+    const hourlyRate = basePrice * 0.1;
+    overstayFee = Math.min(overstayHours * hourlyRate, basePrice);
+  }
+
+  return {
+    bookingId: booking.id,
+    guestName: booking.customer?.fullName ?? 'Khách',
+    roomNumber: booking.room.roomNumber,
+    checkOutDate: booking.checkOutDate,
+    actualCheckOut: now,
+    overstayHours,
+    overstayFee,
+    basePrice: Number(booking.room.roomType.basePrice),
+  };
 };

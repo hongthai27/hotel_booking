@@ -55,6 +55,7 @@ export const updateRoomStatusSchema = z.object({
     required_error: 'Trạng thái phòng là bắt buộc',
     invalid_type_error: 'Trạng thái phòng không hợp lệ',
   }),
+  version: z.number({ required_error: 'Version là bắt buộc' }).int().nonnegative('Version không hợp lệ'),
 });
 
 export const searchAvailableSchema = z.object({

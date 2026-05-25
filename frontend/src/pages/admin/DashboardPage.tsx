@@ -3,8 +3,8 @@ import { useRoomOverview } from '../../hooks/queries/useAdminBookingsQuery';
 import { useSocketAllBookings } from '../../hooks/useSocketBooking';
 import { formatVND, formatDate } from '../../utils/format';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminService } from '../../services/adminService';
 import { toast } from 'sonner';
+import api from '../../services/api';
 
 export interface RoomGuestOverview {
   bookingId: number;
@@ -14,6 +14,7 @@ export interface RoomGuestOverview {
   checkOutDate: string;
   guestCount: number;
   isUpcoming?: boolean;
+  isOverdue?: boolean;
 }
 
 export interface RoomOverview {
@@ -25,6 +26,7 @@ export interface RoomOverview {
   typeName: string;
   maxCapacity: number;
   currentGuest: RoomGuestOverview | null;
+  version: number;
 }
 
 const STATUS_CONFIG = {
@@ -63,7 +65,7 @@ const STATUS_CONFIG = {
 interface RoomCardProps {
   room: RoomOverview;
   cfg: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG];
-  onStatusChange: (roomId: number, status: 'available' | 'maintenance') => void;
+  onStatusChange: (roomId: number, status: 'available' | 'maintenance', version: number) => void;
   isUpdating: boolean;
 }
 
@@ -74,16 +76,24 @@ const RoomCard: React.FC<RoomCardProps> = ({
   isUpdating,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const isOverdue = room.currentGuest?.isOverdue;
 
   return (
     <div
       className={`
-        relative ${cfg.bg} border-2 ${cfg.border} rounded-xl p-3
+        relative ${cfg.bg} border-2 ${isOverdue ? 'border-red-500 ring-2 ring-red-500/20 animate-pulse' : cfg.border} rounded-xl p-3
         cursor-pointer hover:shadow-md transition-shadow select-none
       `}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
+      {isOverdue && (
+        <div className="absolute -top-2.5 -right-2.5 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-sm border border-white z-10 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+          QUÁ GIỜ
+        </div>
+      )}
+
       <div className={`text-sm font-bold flex items-center justify-between ${cfg.text}`}>
         <span>{room.roomNumber}</span>
       </div>
@@ -101,7 +111,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
           disabled={isUpdating}
           onClick={(e) => {
             e.stopPropagation();
-            onStatusChange(room.roomId, 'available');
+          onStatusChange(room.roomId, 'available', room.version);
           }}
           className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white text-[11px] py-1 rounded-lg font-bold transition-all shadow-sm disabled:opacity-50"
         >
@@ -114,7 +124,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
           disabled={isUpdating}
           onClick={(e) => {
             e.stopPropagation();
-            onStatusChange(room.roomId, 'available');
+          onStatusChange(room.roomId, 'available', room.version);
           }}
           className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] py-1 rounded-lg font-bold transition-all shadow-sm disabled:opacity-50"
         >
@@ -136,16 +146,23 @@ const RoomCard: React.FC<RoomCardProps> = ({
 
           {room.currentGuest && (
             <div className="border-t border-gray-100 mt-3 pt-3">
-              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${room.currentGuest.isUpcoming ? 'text-orange-600' : 'text-blue-600'}`}>
-                {room.currentGuest.isUpcoming ? 'Khách sắp đến hôm nay' : 'Khách đang ở'}
+              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${room.currentGuest.isUpcoming ? 'text-orange-600' : isOverdue ? 'text-red-600' : 'text-blue-600'}`}>
+                {room.currentGuest.isUpcoming ? 'Khách sắp đến hôm nay' : isOverdue ? 'Khách quá hạn trả phòng' : 'Khách đang ở'}
               </div>
               <div className="text-sm font-semibold text-gray-700 mb-0.5">
                 {room.currentGuest.guestName}
               </div>
-              <div className="text-xs text-gray-500 mb-2">
+              <div className="text-xs text-gray-500 mb-0.5">
                  SĐT: {room.currentGuest.guestPhone}
               </div>
-              <div className={`text-xs font-medium p-2 rounded-lg ${room.currentGuest.isUpcoming ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-500'}`}>
+              <div className="text-xs text-gray-500 mb-2">
+                 Mã đơn: <span className="font-mono font-medium text-gray-700">#{room.currentGuest.bookingId}</span>
+              </div>
+              <div className={`text-xs font-medium p-2 rounded-lg ${
+                isOverdue ? 'bg-red-50 text-red-600 border border-red-200' : 
+                room.currentGuest.isUpcoming ? 'bg-orange-50 text-orange-600' : 
+                'bg-blue-50 text-blue-600'
+              }`}>
                 {room.currentGuest.isUpcoming 
                   ? `Nhận phòng: ${formatDate(room.currentGuest.checkInDate)} (Sau 14:00)`
                   : `Trả phòng: ${formatDate(room.currentGuest.checkOutDate)} (Trước 12:00)`
@@ -161,7 +178,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
                 disabled={isUpdating}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onStatusChange(room.roomId, 'maintenance');
+          onStatusChange(room.roomId, 'maintenance', room.version);
                   setShowTooltip(false);
                 }}
                 className="w-full text-center text-red-600 bg-red-50 hover:bg-red-100 font-bold text-[11px] py-1.5 rounded-lg border border-red-200 transition-all disabled:opacity-50"
@@ -186,8 +203,8 @@ const DashboardPage: React.FC = () => {
 
   // Mutation xử lý cập nhật trạng thái phòng (Dọn xong / Báo bảo trì)
   const { mutate: updateStatus, isPending: isUpdatingStatus } = useMutation({
-    mutationFn: ({ roomId, status }: { roomId: number; status: 'available' | 'maintenance' }) => 
-      adminService.updateRoomStatus(roomId, status),
+    mutationFn: ({ roomId, status, version }: { roomId: number; status: 'available' | 'maintenance', version: number }) => 
+      api.patch(`/admin/rooms/${roomId}/status`, { status, version }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
       queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
@@ -276,7 +293,7 @@ const DashboardPage: React.FC = () => {
                       key={room.roomId} 
                       room={room} 
                       cfg={cfg} 
-                      onStatusChange={(id, stat) => updateStatus({ roomId: id, status: stat })}
+                onStatusChange={(id, stat, version) => updateStatus({ roomId: id, status: stat, version })}
                       isUpdating={isUpdatingStatus}
                     />
                   );

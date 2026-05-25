@@ -144,9 +144,9 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg flex flex-col gap-6 p-8 overflow-y-auto max-h-[90vh]">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg flex flex-col gap-5 sm:gap-6 p-5 sm:p-8 overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-gray-800">Tạo đơn tại quầy</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Tạo đơn tại quầy</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -161,7 +161,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
           </label>
 
           {isNewCustomer ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input type="text" placeholder="Họ và tên" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               <input type="text" placeholder="Số điện thoại" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
@@ -182,7 +182,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 ml-1">Ngày nhận phòng</label>
             <input type="date" min={today} value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -193,7 +193,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 ml-1">Số lượng khách</label>
             <input type="number" min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -243,9 +243,9 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
           </div>
         )}
 
-        <div className="flex gap-3 mt-2">
-          <button onClick={onClose} className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">Hủy bỏ</button>
-          <button onClick={handleSubmit} disabled={isPending || !validateForm()} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-blue-700 shadow-md shadow-blue-100">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 mt-2">
+          <button onClick={onClose} className="w-full sm:flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">Hủy bỏ</button>
+          <button onClick={handleSubmit} disabled={isPending || !validateForm()} className="w-full sm:flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-blue-700 shadow-md shadow-blue-100">
             {isPending ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
           </button>
         </div>
@@ -344,13 +344,13 @@ const BookingListPage = () => {
 
   return (
     <div className="flex flex-col gap-6 relative">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h2 className="text-lg font-medium text-gray-800">
           Quản lý đơn đặt phòng
         </h2>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-primary hover:bg-primary-dark text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors w-full sm:w-auto"
         >
           Tạo đơn tại quầy
         </button>
@@ -362,13 +362,13 @@ const BookingListPage = () => {
           placeholder="Tìm theo tên khách, mã đơn..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full sm:w-64"
+          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full sm:flex-1"
         />
 
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full sm:w-auto"
         >
           <option value="">Tất cả trạng thái</option>
           <option value="pending_payment">Chờ thanh toán</option>
@@ -381,7 +381,7 @@ const BookingListPage = () => {
         <select
           value={source}
           onChange={(e) => setSource(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full sm:w-auto"
         >
           <option value="">Tất cả nguồn</option>
           <option value="online">Trực tuyến</option>

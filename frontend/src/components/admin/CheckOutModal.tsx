@@ -38,6 +38,7 @@ const CheckOutModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
   const [extras, setExtras] = useState<ExtraCharge[]>([]);
   const [newLabel, setNewLabel] = useState('');
   const [newAmount, setNewAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'qr_code'>('cash');
 
   const checkOutMutation = useCheckOut();
 
@@ -55,12 +56,13 @@ const CheckOutModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
     setExtras([]);
     setNewLabel('');
     setNewAmount('');
+    setPaymentMethod('cash');
     onClose();
   };
 
   const handleSubmit = async () => {
     try {
-      await checkOutMutation.mutateAsync({ id: booking.id, extraCharges: extras });
+      await checkOutMutation.mutateAsync({ id: booking.id, extraCharges: extras, paymentMethod } as any);
       onSuccess();
       handleClose();
     } catch {
@@ -72,7 +74,6 @@ const CheckOutModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
 
   const roomTotal = Number(booking.totalAmount ?? 0);
   const extraTotal = extras.reduce((sum, e) => sum + e.amount, 0);
-  const grandTotal = roomTotal + extraTotal;
   const nights = calcNights(booking.checkInDate, booking.checkOutDate);
 
   return (
@@ -197,20 +198,40 @@ const CheckOutModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
 
           {/* Tổng cộng */}
           <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Tiền phòng (đã thanh toán trước)</span>
+              <span className="text-gray-600 font-medium">
+                {formatVND(roomTotal)}
+              </span>
+            </div>
             {extraTotal > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tổng phụ thu</span>
+                <span className="text-gray-500">Tổng phụ thu phát sinh</span>
                 <span className="text-orange-600 font-medium">
                   {formatVND(extraTotal)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="font-medium text-gray-800 text-sm">TỔNG THANH TOÁN</span>
-              <span className="text-xl font-medium text-primary">
-                {formatVND(grandTotal)}
+            <div className="flex justify-between items-center mt-2">
+              <span className="font-bold text-gray-800 text-sm uppercase">Số tiền cần thu thêm</span>
+              <span className="text-xl font-bold text-primary">
+                {formatVND(extraTotal)}
               </span>
             </div>
+            {extraTotal > 0 && (
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                <span className="text-sm font-medium text-gray-700">Thanh toán phụ thu bằng</span>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as any)}
+                  className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white cursor-pointer"
+                >
+                  <option value="cash">Tiền mặt</option>
+                  <option value="qr_code">Chuyển khoản (QR)</option>
+                  <option value="card">Quẹt thẻ</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
