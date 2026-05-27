@@ -23,7 +23,7 @@ const RefundListPage = () => {
   useEffect(() => {
     const handleUpdate = () => {
       // Khi có người hủy phòng, tự động tải lại danh sách hoàn tiền
-      queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
     };
 
     // Gọi đúng tên biến socketService và tên sự kiện BOOKING_UPDATED
@@ -37,7 +37,7 @@ const RefundListPage = () => {
   const confirmMutation = useMutation({
     mutationFn: (paymentId: number) => api.patch(`/admin/payments/${paymentId}/confirm-refund`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
       alert('Xác nhận hoàn tiền thành công!');
     },
     onError: () => {
@@ -58,7 +58,7 @@ const RefundListPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-medium text-gray-800">Quản lý hoàn tiền</h2>
+      <h2 className="text-2xl font-bold text-gray-800">Quản lý hoàn tiền</h2>
 
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col gap-1 w-full sm:w-fit">
         <span className="text-xs text-gray-400">Tổng tiền đã hoàn</span>

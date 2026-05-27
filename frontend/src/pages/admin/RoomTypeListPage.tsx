@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useCreateRoomType, useUpdateRoomType } from '../../hooks/mutations/useRoomTypeMutation';
 import { useAdminRoomTypes } from '../../hooks/queries/useAdminBookingsQuery';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { toast } from 'sonner';
 
@@ -19,16 +18,16 @@ const roomTypeSchema = z.object({
 
 type RoomTypeFormValues = z.infer<typeof roomTypeSchema>;
 
-const MOCK_AMENITIES = [
-  { id: 1, amenityName: 'WiFi miễn phí' },
-  { id: 2, amenityName: 'Điều hòa nhiệt độ' },
-  { id: 3, amenityName: 'TV màn hình phẳng' },
-  { id: 4, amenityName: 'Minibar' },
-  { id: 5, amenityName: 'Bồn tắm' },
-  { id: 6, amenityName: 'Ban công' },
-  { id: 7, amenityName: 'Két an toàn' },
-  { id: 8, amenityName: 'Dịch vụ phòng 24/7' },
-];
+const formatCurrency = (value: number | undefined | null) => {
+  if (value === undefined || value === null || isNaN(value)) return '';
+  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+const parseCurrency = (value: string) => {
+  const numericString = value.replace(/\D/g, '');
+  if (!numericString) return 0;
+  return parseInt(numericString, 10);
+};
 
 const SkeletonCard = () => (
   <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden animate-pulse">
@@ -59,9 +58,16 @@ const RoomTypeFormModal = ({
   onClose: () => void;
   defaultValues?: any;
 }) => {
+  const queryClient = useQueryClient();
+  const { data: amenitiesList = [], isLoading: isLoadingAmenities } = useQuery({
+    queryKey: ['admin', 'amenities'],
+    queryFn: () => api.get('/admin/amenities').then(res => res.data?.data || res.data)
+  });
+
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<RoomTypeFormValues>({
     resolver: zodResolver(roomTypeSchema),
@@ -76,15 +82,35 @@ const RoomTypeFormModal = ({
   });
 
   const [selectedAmenities, setSelectedAmenities] = useState<number[]>(
-    defaultValues?.amenities?.map((a: any) => a.amenity?.id ?? a.id) ?? []
+    defaultValues?.amenities?.map((a: any) => a.amenityId ?? a.amenity?.id ?? a.id) ?? []
   );
 
   const [deleteImageIds, setDeleteImageIds] = useState<number[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
-  const { mutate: createRoomType, isPending: isCreating } = useCreateRoomType();
-  const { mutate: updateRoomType, isPending: isUpdating } = useUpdateRoomType();
+  const { mutate: createRoomType, isPending: isCreating } = useMutation({
+    mutationFn: (data: FormData) => api.post('/admin/room-types', data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Thêm hạng phòng thành công');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra'),
+  });
+
+  const { mutate: updateRoomType, isPending: isUpdating } = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: FormData }) => api.put(`/admin/room-types/${id}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Cập nhật hạng phòng thành công');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra'),
+  });
+
   const isPending = isCreating || isUpdating;
 
   const existingImages: { id: number; imageUrl: string }[] = defaultValues?.images ?? [];
@@ -142,7 +168,7 @@ const RoomTypeFormModal = ({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-md w-full max-w-lg flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-          <h3 className="text-base font-medium text-gray-800">
+          <h3 className="text-xl font-bold text-gray-800">
             {defaultValues ? 'Chỉnh sửa hạng phòng' : 'Thêm hạng phòng'}
           </h3>
           <button
@@ -188,10 +214,17 @@ const RoomTypeFormModal = ({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-gray-500">Giá / đêm (đ)</label>
-              <input
-                type="number"
-                {...register('basePrice', { valueAsNumber: true })}
-                className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full"
+              <Controller
+                control={control}
+                name="basePrice"
+                render={({ field: { onChange, value } }) => (
+                  <input
+                    type="text"
+                    value={formatCurrency(value)}
+                    onChange={(e) => onChange(parseCurrency(e.target.value))}
+                    className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-full"
+                  />
+                )}
               />
               {errors.basePrice && (
                 <p className="text-red-500 text-xs">{errors.basePrice.message}</p>
@@ -290,22 +323,28 @@ const RoomTypeFormModal = ({
 
           <div className="flex flex-col gap-2">
             <label className="text-xs text-gray-500">Tiện nghi</label>
-            <div className="grid grid-cols-2 gap-2">
-              {MOCK_AMENITIES.map((amenity) => (
-                <label
-                  key={amenity.id}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedAmenities.includes(amenity.id)}
-                    onChange={() => toggleAmenity(amenity.id)}
-                    className="accent-primary w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700">{amenity.amenityName}</span>
-                </label>
-              ))}
-            </div>
+            {isLoadingAmenities ? (
+              <div className="text-xs text-gray-400">Đang tải danh sách tiện nghi...</div>
+            ) : amenitiesList.length === 0 ? (
+              <div className="text-xs text-gray-400">Chưa có tiện nghi nào. Hãy thêm trong Quản lý Tiện ích.</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {amenitiesList.map((amenity: any) => (
+                  <label
+                    key={amenity.id}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAmenities.includes(amenity.id)}
+                      onChange={() => toggleAmenity(amenity.id)}
+                      className="accent-primary w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">{amenity.amenityName}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </form>
 
@@ -332,10 +371,118 @@ const RoomTypeFormModal = ({
   );
 };
 
+const RoomFormModal = ({
+  onClose,
+  defaultValues,
+  roomTypeId,
+}: {
+  onClose: () => void;
+  defaultValues?: any;
+  roomTypeId: number;
+}) => {
+  const queryClient = useQueryClient();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: defaultValues
+      ? {
+          roomNumber: defaultValues.roomNumber,
+          floor: defaultValues.floor || 1,
+          status: defaultValues.status || 'available',
+        }
+      : { roomNumber: '', floor: 1, status: 'available' },
+  });
+
+  const { mutate: saveRoom, isPending } = useMutation({
+    mutationFn: (data: any) =>
+      defaultValues
+        ? api.put(`/admin/rooms/${defaultValues.id}`, data)
+        : api.post('/admin/rooms', { ...data, roomTypeId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      toast.success(defaultValues ? 'Cập nhật phòng thành công' : 'Thêm phòng thành công');
+      onClose();
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra'),
+  });
+
+  const onSubmit = (data: any) => {
+    saveRoom({
+      roomNumber: data.roomNumber,
+      floor: Number(data.floor),
+      status: data.status,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-md w-full max-w-sm flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+          <h3 className="text-xl font-bold text-gray-800">
+            {defaultValues ? 'Chỉnh sửa phòng' : 'Thêm phòng mới'}
+          </h3>
+          <button onClick={onClose} disabled={isPending} className="text-gray-400 hover:text-gray-600">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form id="room-form" onSubmit={handleSubmit(onSubmit)} className="p-6 flex flex-col gap-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Số phòng</label>
+            <input
+              {...register('roomNumber', { required: 'Số phòng là bắt buộc' })}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="VD: 101"
+            />
+            {errors.roomNumber && <p className="text-red-500 text-xs mt-1">{errors.roomNumber.message as string}</p>}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Tầng</label>
+            <input
+              type="number"
+              {...register('floor', { required: 'Tầng là bắt buộc', min: 1 })}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          {!defaultValues && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Trạng thái ban đầu</label>
+              <select
+                {...register('status')}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+              >
+                <option value="available">Trống</option>
+                <option value="maintenance">Bảo trì</option>
+                <option value="out_of_order">Ngừng hoạt động</option>
+              </select>
+            </div>
+          )}
+        </form>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+          <button type="button" onClick={onClose} disabled={isPending} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl disabled:opacity-50">Hủy</button>
+          <button type="submit" form="room-form" disabled={isPending} className="px-4 py-2 bg-primary text-white text-sm rounded-xl hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2">
+            {isPending ? 'Đang lưu...' : 'Lưu'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RoomTypeListPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [expandedRoomTypeId, setExpandedRoomTypeId] = useState<number | null>(null);
+  
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [editRoomTarget, setEditRoomTarget] = useState<any>(null);
+  const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(null);
+  
   const queryClient = useQueryClient();
 
   const { data: roomTypes, isLoading } = useAdminRoomTypes();
@@ -352,6 +499,26 @@ const RoomTypeListPage = () => {
     onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật'),
   });
 
+  const deleteRoomMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/admin/rooms/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      toast.success('Xóa phòng thành công');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Không thể xóa phòng này'),
+  });
+
+  const deleteRoomTypeMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/admin/room-types/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Xóa hạng phòng thành công');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Không thể xóa hạng phòng này'),
+  });
+
   const toggleExpand = (id: number) => {
     setExpandedRoomTypeId(prev => (prev === id ? null : id));
   };
@@ -359,7 +526,7 @@ const RoomTypeListPage = () => {
   return (
     <div className="flex flex-col gap-6 relative">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-800">Quản lý hạng phòng</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Quản lý hạng phòng</h2>
         <button
           onClick={() => {
             setEditTarget(null);
@@ -424,7 +591,7 @@ const RoomTypeListPage = () => {
                   </div>
 
                   <p className="text-primary font-medium text-sm">
-                    {rt.basePrice?.toLocaleString('vi-VN')}đ
+                    {Number(rt.basePrice || 0).toLocaleString('vi-VN')}đ
                     <span className="text-gray-400 font-normal"> / đêm</span>
                   </p>
 
@@ -459,7 +626,12 @@ const RoomTypeListPage = () => {
                         Sửa
                       </button>
                       <button 
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Xác nhận xóa hạng phòng ${rt.typeName}?`)) {
+                            deleteRoomTypeMutation.mutate(rt.id);
+                          }
+                        }} 
                         className="text-red-500 text-sm font-medium hover:underline"
                       >
                         Xóa
@@ -473,9 +645,22 @@ const RoomTypeListPage = () => {
                     className="border-t border-gray-100 bg-gray-50/50 p-4 cursor-default"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <h4 className="text-sm font-medium text-gray-800 mb-3">
-                      Danh sách phòng ({rt.rooms?.length || 0})
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-800">
+                        Danh sách phòng ({rt.rooms?.length || 0})
+                      </h4>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedRoomTypeId(rt.id);
+                          setEditRoomTarget(null);
+                          setShowRoomModal(true);
+                        }}
+                        className="text-xs font-medium bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                      >
+                        + Thêm phòng
+                      </button>
+                    </div>
                     
                     {rt.rooms && rt.rooms.length > 0 ? (
                       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -486,6 +671,7 @@ const RoomTypeListPage = () => {
                               <th className="px-3 py-2 font-medium">Tầng</th>
                               <th className="px-3 py-2 font-medium">Giá</th>
                               <th className="px-3 py-2 font-medium">Trạng thái</th>
+                              <th className="px-3 py-2 font-medium text-right">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -498,7 +684,7 @@ const RoomTypeListPage = () => {
                                   {room.floor}
                                 </td>
                                 <td className="px-3 py-2 text-gray-600">
-                                  {(room.basePrice ?? rt.basePrice).toLocaleString('vi-VN')}đ
+                                  {Number(room.basePrice ?? rt.basePrice).toLocaleString('vi-VN')}đ
                                 </td>
                                 <td className="px-3 py-2">
                                   <select
@@ -510,7 +696,32 @@ const RoomTypeListPage = () => {
                                     <option value="available">Trống</option>
                                     <option value="occupied">Đang ở</option>
                                     <option value="maintenance">Bảo trì</option>
+                                <option value="out_of_order">Ngừng hoạt động</option>
                                   </select>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedRoomTypeId(rt.id);
+                                      setEditRoomTarget(room);
+                                      setShowRoomModal(true);
+                                    }}
+                                    className="text-blue-600 hover:underline mr-3 font-medium"
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm(`Xác nhận xóa phòng ${room.roomNumber}?`)) {
+                                        deleteRoomMutation.mutate(room.id);
+                                      }
+                                    }}
+                                    className="text-red-500 hover:underline font-medium"
+                                  >
+                                    Xóa
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -537,6 +748,14 @@ const RoomTypeListPage = () => {
             setEditTarget(null);
           }}
           defaultValues={editTarget}
+        />
+      )}
+
+      {showRoomModal && selectedRoomTypeId !== null && (
+        <RoomFormModal
+          onClose={() => setShowRoomModal(false)}
+          defaultValues={editRoomTarget}
+          roomTypeId={selectedRoomTypeId}
         />
       )}
     </div>

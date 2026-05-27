@@ -44,12 +44,12 @@ export const bookingService = {
   createReview: (
     bookingId: number,
     data: { rating: number; comment?: string }
-  ) =>
+  ): Promise<Review> =>
     api
-      .post(`/bookings/${bookingId}/review`, data)
-      .then((r) => r.data),
+      .post<{ data: Review }>(`/bookings/${bookingId}/review`, data)
+      .then((r) => r.data.data),
 
-  getReviewsByRoomType: (roomTypeId: number) =>
+  getReviewsByRoomType: (roomTypeId: number): Promise<Review[]> =>
     api
       .get<{ data: Review[] }>(`/hotels/${roomTypeId}/reviews`)
       .then((r) => r.data.data),

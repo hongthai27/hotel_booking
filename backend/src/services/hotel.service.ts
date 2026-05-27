@@ -57,10 +57,33 @@ export const getRoomTypeById = async (id: number) => {
   return formattedRoomType;
 };
 
-export const createRoomType = async (data: RoomTypeDto, actorId: number) => {
-  const imageUrls = data.images && data.images.length > 0
-    ? await Promise.all(data.images.map((image) => uploadImage(image)))
-    : [];
+export const createRoomType = async (data: RoomTypeDto, files: Express.Multer.File[], actorId: number) => {
+  let imageUrls: string[] = [];
+  if (files && files.length > 0) {
+    const uploadPromises = files.map(async (file) => {
+      let dataURI = '';
+      if (file.buffer) {
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        dataURI = "data:" + file.mimetype + ";base64," + b64;
+      } else if (file.path) {
+        dataURI = file.path;
+      }
+      if (!dataURI) return null;
+      const res = await uploadImage(dataURI);
+      let url = typeof res === 'string' ? res : (res as any).secure_url;
+      
+      // Tối ưu hóa dung lượng ảnh qua URL Delivery của Cloudinary
+      // Bổ sung: format auto, quality auto, giới hạn chiều rộng 1200px
+      if (url && url.includes('/upload/')) {
+        url = url.replace('/upload/', '/upload/f_auto,q_auto,w_1200,c_limit/');
+      }
+
+      console.log('Đã tải ảnh lên Cloudinary:', url);
+      return url;
+    });
+    const results = await Promise.all(uploadPromises);
+    imageUrls = results.filter((url): url is string => Boolean(url));
+  }
 
   return prisma.$transaction(async (tx) => {
     const newRoomType = await tx.roomType.create({
@@ -123,9 +146,22 @@ export const updateRoomType = async (
 
   let newImageUrls: string[] = [];
   if (files && files.length > 0) {
-    newImageUrls = await Promise.all(
-      files.map((file) => uploadImage(file.path))
-    );
+    const uploadPromises = files.map(async (file) => {
+      let dataURI = '';
+      if (file.buffer) {
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        dataURI = "data:" + file.mimetype + ";base64," + b64;
+      } else if (file.path) {
+        dataURI = file.path;
+      }
+      if (!dataURI) return null;
+      const res = await uploadImage(dataURI);
+      const url = typeof res === 'string' ? res : (res as any).secure_url;
+      console.log('Đã tải ảnh lên Cloudinary:', url);
+      return url;
+    });
+    const results = await Promise.all(uploadPromises);
+    newImageUrls = results.filter((url): url is string => Boolean(url));
   }
 
   return prisma.$transaction(async (tx) => {
@@ -134,9 +170,9 @@ export const updateRoomType = async (
         data.deleteImageIds!.includes(img.id)
       );
 
-      imagesToDelete.forEach((img) => {
-        deleteCloudinaryImage(img.imageUrl);
-      });
+      await Promise.allSettled(
+        imagesToDelete.map((img) => deleteCloudinaryImage(img.imageUrl))
+      );
 
       await tx.roomImage.deleteMany({
         where: {
@@ -262,10 +298,14 @@ export const deleteRoomType = async (id: number, actorId: number) => {
   }
 
   if (existing.images.length > 0) {
-      Promise.allSettled(existing.images.map((img) => deleteCloudinaryImage(img.imageUrl)));
+      await Promise.allSettled(existing.images.map((img) => deleteCloudinaryImage(img.imageUrl)));
   }
 
   return prisma.$transaction(async (tx) => {
+    // Xóa dữ liệu liên kết trước khi xóa RoomType (đề phòng lỗi Foreign Key)
+    await tx.roomImage.deleteMany({ where: { roomTypeId: id } });
+    await tx.roomTypeAmenity.deleteMany({ where: { roomTypeId: id } });
+
     await tx.roomType.delete({ where: { id } });
 
     await createAuditLog({
@@ -297,7 +337,7 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
 
   // Thêm type annotation Prisma.RoomWhereInput
   const availableRoomCondition: Prisma.RoomWhereInput = {
-    status: { not: 'maintenance' },
+    status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
     bookings: {
       none: {
         status: { notIn: ['cancelled'] as BookingStatus[] },
@@ -376,7 +416,7 @@ export const createRoom = async (data: RoomDto, actorId: number) => {
       data: {
         roomNumber: data.roomNumber,
         floor: data.floor,
-        status: data.status,
+        status: data.status as RoomStatus,
         currentPrice: roomType.basePrice,
         roomType: {
           connect: { id: data.roomTypeId }
@@ -407,7 +447,7 @@ export const updateRoom = async (id: number, data: Partial<RoomDto>, actorId: nu
 
   // Không cho phép cập nhật status qua hàm này
   // Mọi thay đổi status phải đi qua updateRoomStatus để kiểm tra booking
-  const { status: _, ...safeData } = data;
+  const { status, ...safeData } = data;
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.room.update({
@@ -426,6 +466,37 @@ export const updateRoom = async (id: number, data: Partial<RoomDto>, actorId: nu
     });
 
     return updated;
+  });
+};
+
+export const deleteRoom = async (id: number, actorId: number) => {
+  const existing = await prisma.room.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { bookings: true } },
+    },
+  });
+
+  if (!existing) {
+    throw new AppError(404, 'Không tìm thấy phòng');
+  }
+
+  if (existing._count.bookings > 0) {
+    throw new AppError(400, 'Không thể xóa phòng đã từng có lịch sử đặt phòng. Hãy đổi trạng thái sang Bảo trì hoặc Ngừng hoạt động.');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.room.delete({ where: { id } });
+
+    await createAuditLog({
+      tx,
+      actorId,
+      targetTable: 'Room',
+      targetId: id,
+      action: 'DELETE',
+      oldValue: existing,
+      newValue: null,
+    });
   });
 };
 
@@ -453,7 +524,7 @@ export const updateRoomStatus = async (
     }
 
     // Không cho chuyển sang maintenance/cleaning nếu còn booking active
-    if (['maintenance', 'cleaning'].includes(newStatus)) {
+    if (['maintenance', 'cleaning', 'out_of_order'].includes(newStatus)) {
       const activeBooking = await tx.booking.findFirst({
         where: {
           roomId,
@@ -476,7 +547,7 @@ export const updateRoomStatus = async (
         version: currentVersion
       },
       data: {
-        status: newStatus as any,
+        status: newStatus as RoomStatus,
         version: { increment: 1 }, // Tự động tăng version
       },
     });
@@ -585,7 +656,7 @@ export interface RoomOverview {
   roomId: number;
   roomNumber: string;
   floor: number;
-  status: RoomStatus;
+  status: RoomStatus | 'reserved';
   currentPrice: number;
   typeName: string;
   maxCapacity: number;
@@ -638,7 +709,7 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
     });
 
     return rooms.map((room) => {
-      let finalStatus = room.status;
+      let finalStatus: RoomStatus | 'reserved' = room.status;
       let guestInfo: RoomGuestOverview | null = null;
 
       // 1. Khách ĐANG Ở thực tế: Trạng thái đơn phải là 'checked_in'
@@ -664,7 +735,7 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
       );
 
       if (activeBooking) {
-        finalStatus = room.status === 'available' ? ('occupied' as any) : room.status; 
+        finalStatus = room.status === 'available' ? 'occupied' : room.status; 
         
         // Kiểm tra xem đã quá hạn Check-out chưa (ví dụ lố qua 12:00 trưa)
         const isOverdue = now > new Date(activeBooking.checkOutDate);
@@ -681,7 +752,7 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
         };
         
       } else if (upcomingBooking && room.status === 'available') {
-        finalStatus = 'reserved' as any;
+        finalStatus = 'reserved';
         guestInfo = {
           bookingId: upcomingBooking.id,
           guestName: upcomingBooking.customer?.fullName ?? 'Khách',

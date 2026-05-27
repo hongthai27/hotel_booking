@@ -133,7 +133,7 @@ const PromotionListPage = () => {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-800">Quản lý mã Khuyến mãi</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Quản lý mã Khuyến mãi</h2>
         <button
           onClick={() => handleOpenModal()}
           className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors shadow-sm"
@@ -214,7 +214,7 @@ const PromotionListPage = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-            <h3 className="text-xl font-medium text-gray-800 mb-5">{editingId ? 'Chỉnh sửa ưu đãi' : 'Tạo ưu đãi mới'}</h3>
+            <h3 className="text-2xl font-bold text-gray-800 mb-5">{editingId ? 'Chỉnh sửa ưu đãi' : 'Tạo ưu đãi mới'}</h3>
             
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">

@@ -270,7 +270,7 @@ const BookingDetailPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
           </button>
-          <h2 className="text-xl font-semibold text-gray-800">Chi tiết đơn đặt phòng</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Chi tiết đơn đặt phòng</h2>
         </div>
 
         {/* Nút Xuất PDF được tiêm vào đây */}

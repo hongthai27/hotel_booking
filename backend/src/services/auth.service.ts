@@ -14,7 +14,7 @@ import { env } from '../config/env.config';
 const SALT_ROUNDS = 10;
 
 const excludePassword = (user: { passwordHash: string; [key: string]: unknown }) => {
-  const { passwordHash: _, ...safeUser } = user;
+  const { passwordHash, ...safeUser } = user;
   return safeUser;
 };
 
@@ -221,8 +221,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
     data: { resetToken: token, resetTokenExpiry: expiry },
   });
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+  const resetLink = `${env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
   await sendResetPasswordEmail(user.email, user.fullName, resetLink);
 };

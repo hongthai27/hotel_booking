@@ -31,7 +31,31 @@ export const getRoomTypeById = catchAsync(async (req: Request, res: Response) =>
 });
 
 export const createRoomType = catchAsync(async (req: Request, res: Response) => {
-  const roomType = await hotelService.createRoomType(req.body, req.user!.userId);
+  const { amenityIds, ...data } = req.body;
+  
+  const parsedAmenityIds: number[] = typeof amenityIds === 'string'
+    ? JSON.parse(amenityIds)
+    : (Array.isArray(amenityIds) ? amenityIds.map(Number) : []);
+
+  let files: Express.Multer.File[] = [];
+  if (Array.isArray(req.files)) {
+    files = req.files;
+  } else if (req.files && typeof req.files === 'object') {
+    files = Object.values(req.files).flat() as Express.Multer.File[];
+  }
+  if (req.file) {
+    files.push(req.file);
+  }
+
+  const roomType = await hotelService.createRoomType(
+    { ...data,
+      basePrice: data.basePrice !== undefined ? Number(data.basePrice) : undefined,
+      maxCapacity: data.maxCapacity !== undefined ? Number(data.maxCapacity) : undefined,
+      amenityIds: parsedAmenityIds } as any,
+    files,
+    req.user!.userId
+  );
+
   successResponse(res, roomType, 'Tạo loại phòng thành công', 201);
 });
 
@@ -50,15 +74,27 @@ export const updateRoomType = catchAsync(async (req: Request, res: Response) => 
     ? JSON.parse(amenityIds)
     : (Array.isArray(amenityIds) ? amenityIds.map(Number) : []);
 
+  let files: Express.Multer.File[] = [];
+  if (Array.isArray(req.files)) {
+    files = req.files;
+  } else if (req.files && typeof req.files === 'object') {
+    files = Object.values(req.files).flat() as Express.Multer.File[];
+  }
+  if (req.file) {
+    files.push(req.file);
+  }
+
   const updated = await hotelService.updateRoomType(
     Number(req.params.id),
     {
       ...data,
+      basePrice: data.basePrice !== undefined ? Number(data.basePrice) : undefined,
+      maxCapacity: data.maxCapacity !== undefined ? Number(data.maxCapacity) : undefined,
       version: Number(version),
       deleteImageIds: parsedDeleteImageIds,
       amenityIds: parsedAmenityIds,
-    },
-    (req.files as Express.Multer.File[]) || [],
+    } as any,
+    files,
     req.user!.userId
   );
 
@@ -115,6 +151,11 @@ export const updateRoomStatus = catchAsync(async (req: Request, res: Response) =
   );
   
   successResponse(res, updated, 'Cập nhật trạng thái phòng thành công');
+});
+
+export const deleteRoom = catchAsync(async (req: Request, res: Response) => {
+  await hotelService.deleteRoom(Number(req.params.id), req.user!.userId);
+  successResponse(res, null, 'Xóa phòng thành công');
 });
 
 // ── Search ─────────────────────────────────────────────────────────────────────

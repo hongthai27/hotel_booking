@@ -160,7 +160,7 @@ export const simulateSuccess = async (transactionRef: string) => {
     });
 
     // Fire and forget - Không block luồng response
-    sendBookingConfirmationEmail(
+    void sendBookingConfirmationEmail(
       {
         ...booking,
         // Truyền đích danh tên hạng phòng và số phòng ra ngoài để template Email dễ đọc
@@ -168,9 +168,9 @@ export const simulateSuccess = async (transactionRef: string) => {
         roomTypeName: booking.room.roomType.typeName,
         roomNumber: booking.room.roomNumber,
         totalAmount: Number(booking.totalAmount),
-      } as any,
+      } as never,
       booking.customer
-    );
+    ).catch(() => {});
   }
 
   return {

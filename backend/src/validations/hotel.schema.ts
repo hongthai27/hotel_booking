@@ -13,15 +13,22 @@ export const roomTypeSchema = z.object({
     .number({ required_error: 'Giá cơ bản là bắt buộc' })
     .nonnegative('Giá cơ bản không được âm'),
   amenityIds: z
-    .union([z.string(), z.array(z.coerce.number().int().positive())])
+    .any()
     .transform((val) => {
-      if (typeof val === 'string') return JSON.parse(val) as number[];
-      return val;
-    })
-    .default([]),
-  images: z
-    .array(z.string().url('URL hình ảnh không hợp lệ'))
-    .optional(),
+      if (Array.isArray(val)) return val.map(Number);
+      if (typeof val === 'string') {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed.map(Number);
+          return [Number(parsed)];
+        } catch {
+          return [Number(val)];
+        }
+      }
+      return [];
+    }),
+  version: z.coerce.number().int().nonnegative().optional(),
+  deleteImageIds: z.union([z.string(), z.array(z.coerce.number().int().positive())]).optional(),
 });
 
 export const roomSchema = z.object({
@@ -36,7 +43,7 @@ export const roomSchema = z.object({
   floor: z.coerce
     .number().int().positive('Tầng phải lớn hơn 0')
     .optional(),
-  status: z.enum(['available', 'occupied', 'maintenance', 'cleaning'], {
+  status: z.enum(['available', 'occupied', 'maintenance', 'cleaning', 'out_of_order'], {
     required_error: 'Trạng thái phòng là bắt buộc',
     invalid_type_error: 'Trạng thái phòng không hợp lệ',
   }),
@@ -51,7 +58,7 @@ export const amenitySchema = z.object({
 
 // Thêm schema mới cho PATCH /admin/rooms/:id/status
 export const updateRoomStatusSchema = z.object({
-  status: z.enum(['available', 'occupied', 'maintenance', 'cleaning'], {
+  status: z.enum(['available', 'occupied', 'maintenance', 'cleaning', 'out_of_order'], {
     required_error: 'Trạng thái phòng là bắt buộc',
     invalid_type_error: 'Trạng thái phòng không hợp lệ',
   }),

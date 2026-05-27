@@ -84,7 +84,7 @@ const UserListPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-medium text-gray-800">Quản lý tài khoản</h2>
+      <h2 className="text-2xl font-bold text-gray-800">Quản lý tài khoản</h2>
 
       <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-wrap gap-3">
         <input

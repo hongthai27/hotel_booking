@@ -146,7 +146,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg flex flex-col gap-5 sm:gap-6 p-5 sm:p-8 overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Tạo đơn tại quầy</h3>
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-800">Tạo đơn tại quầy</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -345,7 +345,7 @@ const BookingListPage = () => {
   return (
     <div className="flex flex-col gap-6 relative">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-gray-800">
+        <h2 className="text-2xl font-bold text-gray-800">
           Quản lý đơn đặt phòng
         </h2>
         <button

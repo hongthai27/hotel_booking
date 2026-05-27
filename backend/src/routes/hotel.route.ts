@@ -119,6 +119,13 @@ router.patch(
   hotelController.updateRoomStatus
 );
 
+router.delete(
+  '/admin/rooms/:id',
+  authenticateJWT,
+  authorizeRole(['admin']),
+  hotelController.deleteRoom
+);
+
 // ── Admin - Amenities (TIỆN ÍCH) ──────────────────────────────────────────────
 
 router.get(

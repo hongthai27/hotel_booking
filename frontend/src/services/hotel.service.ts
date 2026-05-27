@@ -2,19 +2,19 @@ import api from './api';
 import type { RoomType, SearchParams } from '../types/hotel.types';
 
 export const hotelService = {
-  getAvailable: (params: SearchParams) =>
+  getAvailable: (params: SearchParams): Promise<RoomType[]> =>
     api
       .get<{ data: RoomType[] }>('/hotels/available', {
         params,
       })
       .then((r) => r.data.data),
 
-  getById: (id: number) =>
+  getById: (id: number): Promise<RoomType> =>
     api
       .get<{ data: RoomType }>(`/hotels/${id}`)
       .then((r) => r.data.data),
 
-  getAll: () =>
+  getAll: (): Promise<RoomType[]> =>
     api
       .get<{ data: RoomType[] }>('/hotels')
       .then((r) => r.data.data),

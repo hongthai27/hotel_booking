@@ -85,7 +85,7 @@ const ReportPage = () => {
   return (
     <div className="flex flex-col gap-6">
       {/* ── Heading ── */}
-      <h2 className="text-lg font-medium text-gray-800">Báo cáo doanh thu</h2>
+      <h2 className="text-2xl font-bold text-gray-800">Báo cáo doanh thu</h2>
 
       {/* ── Filter ── */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-wrap items-end gap-4">

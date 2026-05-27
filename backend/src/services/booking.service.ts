@@ -1,7 +1,7 @@
 import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
 import { createAuditLog } from '../utils/audit-log.util';
-import { BookingStatus, BookingSource } from '@prisma/client';
+import { Prisma, BookingStatus, BookingSource, RoomStatus } from '@prisma/client';
 import { sendCancellationEmail } from '../utils/email.util';
 import { CreateBookingDto, CreateOfflineBookingDto } from '../validations/booking.schema';
 import { emitBookingUpdate } from '../utils/socket.util';
@@ -19,7 +19,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: { not: 'maintenance' },
+        status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
       },
       include: { roomType: true },
     });
@@ -248,16 +248,17 @@ interface GetAllBookingsFilter {
   limit?: number;
   search?: string;
   keyword?: string;
+  q?: string;
 }
 
-export const getAllBookings = async (filter?: any) => {
+export const getAllBookings = async (filter?: GetAllBookingsFilter) => {
   const page = Number(filter?.page) || 1;
   const limit = Number(filter?.limit) || 20;
   const skip = (page - 1) * limit;
   
   const searchKey = filter?.search || filter?.keyword || filter?.q;
 
-  const where: any = {
+  const where: Prisma.BookingWhereInput = {
     ...(filter?.status && { status: filter.status }),
     ...(filter?.source && { source: filter.source }),
     ...(filter?.checkInDate && { 
@@ -476,7 +477,7 @@ export const cancelBooking = async (
   });
 
   if (fullBooking?.customer) {
-    sendCancellationEmail(fullBooking as any, fullBooking.customer, refundAmount);
+    void sendCancellationEmail(fullBooking as never, fullBooking.customer, refundAmount).catch(() => {});
   }
 
   return { refundAmount };
@@ -527,7 +528,7 @@ export const checkIn = async (
       const conflict = await prisma.booking.findFirst({
         where: {
           roomId: r.id,
-          status: { notIn: ['cancelled'] },
+          status: { notIn: ['cancelled'] as BookingStatus[] },
           AND: [
             { checkInDate: { lt: booking.checkOutDate } },
             { checkOutDate: { gt: booking.checkInDate } },
@@ -546,10 +547,11 @@ export const checkIn = async (
       isReassigned = true;
     } else {
       let statusText = '';
-      switch (booking.room.status) {
+      switch (booking.room.status as string) {
         case 'occupied': statusText = 'đang có khách ở (khách cũ chưa check-out)'; break;
         case 'cleaning': statusText = 'đang dọn dẹp chưa xong'; break;
         case 'maintenance': statusText = 'đang bảo trì'; break;
+        case 'out_of_order': statusText = 'đã ngừng hoạt động'; break;
         default: statusText = booking.room.status;
       }
       throw new AppError(400, `Phòng ${booking.room.roomNumber} hiện chưa sẵn sàng (${statusText}) và không còn phòng trống tương đương để đổi. Vui lòng hoàn tất check-out, dọn phòng hoặc đổi hạng phòng khác.`);
@@ -563,7 +565,7 @@ export const checkIn = async (
       const conflict = await tx.booking.findFirst({
         where: {
           roomId: finalRoomId,
-          status: { notIn: ['cancelled'] },
+          status: { notIn: ['cancelled'] as BookingStatus[] },
           AND: [
             { checkInDate: { lt: booking.checkOutDate } },
             { checkOutDate: { gt: booking.checkInDate } },
@@ -683,7 +685,7 @@ export const checkOut = async (
         data: {
           bookingId,
           amount: extraTotal,
-          method: paymentMethod as any,
+          method: paymentMethod as "cash" | "qr_code",
           status: 'success',
           feeType: 'booking',
           paidAt: new Date(),
@@ -713,14 +715,13 @@ export const checkOut = async (
 };
 
 export const createOfflineBooking = async (
-  data: any,
+  data: CreateOfflineBookingDto,
   staffId: number
 ) => {
   const checkInDate = new Date(data.checkInDate);
   checkInDate.setHours(14, 0, 0, 0);
   const checkOutDate = new Date(data.checkOutDate);
   checkOutDate.setHours(12, 0, 0, 0);
-  const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   return prisma.$transaction(async (tx) => {
     let finalUserId: number;
@@ -745,7 +746,7 @@ export const createOfflineBooking = async (
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: { not: 'maintenance' },
+        status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
       },
       include: { roomType: true },
     });
