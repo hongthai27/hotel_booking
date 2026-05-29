@@ -15,11 +15,19 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
   const checkOutDate = new Date(data.checkOutDate);
   checkOutDate.setHours(12, 0, 0, 0);
 
+  const excludedRoomStatuses = Object.values(RoomStatus).filter((s) =>
+    ['maintenance', 'out_of_order', 'outoforder'].includes(s.toLowerCase())
+  );
+
+  const excludedBookingStatuses = Object.values(BookingStatus).filter((s) =>
+    s.toLowerCase() === 'cancelled'
+  );
+
   return prisma.$transaction(async (tx) => {
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
+        status: { notIn: excludedRoomStatuses },
       },
       include: { roomType: true },
     });
@@ -36,7 +44,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
       const conflict = await tx.booking.findFirst({
         where: {
           roomId: room.id,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
           AND: [
             { checkInDate: { lt: checkOutDate } },
             { checkOutDate: { gt: checkInDate } },
@@ -94,7 +102,7 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
         where: {
           userId,
           promotionId: promo.id,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
         },
       });
 
@@ -512,13 +520,17 @@ export const checkIn = async (
   let isReassigned = false;
   let newRoomNumber = '';
 
+  const excludedBookingStatuses = Object.values(BookingStatus).filter((s) =>
+    s.toLowerCase() === 'cancelled'
+  );
+
   // Kiểm tra xem phòng đã thực sự trống và sẵn sàng chưa
-  if (booking.room.status !== 'available') {
+  if (booking.room.status.toLowerCase() !== 'available') {
     // 1. Tự động tìm phòng trống khác cùng hạng
     const availableRooms = await prisma.room.findMany({
       where: {
         roomTypeId: booking.room.roomTypeId,
-        status: 'available',
+        status: Object.values(RoomStatus).find(s => s.toLowerCase() === 'available') || ('available' as RoomStatus),
         id: { not: booking.roomId }
       }
     });
@@ -528,7 +540,7 @@ export const checkIn = async (
       const conflict = await prisma.booking.findFirst({
         where: {
           roomId: r.id,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
           AND: [
             { checkInDate: { lt: booking.checkOutDate } },
             { checkOutDate: { gt: booking.checkInDate } },
@@ -565,7 +577,7 @@ export const checkIn = async (
       const conflict = await tx.booking.findFirst({
         where: {
           roomId: finalRoomId,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
           AND: [
             { checkInDate: { lt: booking.checkOutDate } },
             { checkOutDate: { gt: booking.checkInDate } },
@@ -575,7 +587,7 @@ export const checkIn = async (
 
       const currentRoomStatus = await tx.room.findUnique({ where: { id: finalRoomId } });
 
-      if (conflict || currentRoomStatus?.status !== 'available') {
+      if (conflict || currentRoomStatus?.status.toLowerCase() !== 'available') {
         throw new AppError(409, 'Phòng được tự động chọn vừa bị thay đổi trạng thái. Vui lòng thử lại.');
       }
     }
@@ -592,7 +604,7 @@ export const checkIn = async (
 
     await tx.room.update({
       where: { id: finalRoomId },
-      data: { status: 'occupied' },
+      data: { status: Object.values(RoomStatus).find(s => s.toLowerCase() === 'occupied') || ('occupied' as RoomStatus) },
     });
 
     await createAuditLog({
@@ -609,7 +621,7 @@ export const checkIn = async (
   emitBookingUpdate(bookingId, {
     status: 'checked_in',
     roomId: finalRoomId,
-    roomStatus: 'occupied',
+    roomStatus: Object.values(RoomStatus).find(s => s.toLowerCase() === 'occupied') || 'occupied',
     ...(isReassigned && { message: `Đã tự động đổi sang phòng ${newRoomNumber}` })
   });
 
@@ -676,7 +688,7 @@ export const checkOut = async (
 
     await tx.room.update({
       where: { id: booking.roomId },
-      data: { status: 'cleaning' },
+      data: { status: Object.values(RoomStatus).find(s => s.toLowerCase() === 'cleaning') || ('cleaning' as RoomStatus) },
     });
 
     // Tạo payment record phụ thu nếu có
@@ -708,7 +720,7 @@ export const checkOut = async (
   emitBookingUpdate(bookingId, {
     status: 'checked_out',
     roomId: booking.roomId,
-    roomStatus: 'cleaning',
+    roomStatus: Object.values(RoomStatus).find(s => s.toLowerCase() === 'cleaning') || 'cleaning',
   });
 
   return { message: 'Check-out thành công', extraTotal };
@@ -743,10 +755,18 @@ export const createOfflineBooking = async (
       throw new AppError(400, 'Thông tin khách hàng không hợp lệ');
     }
 
+    const excludedRoomStatuses = Object.values(RoomStatus).filter((s) =>
+      ['maintenance', 'out_of_order', 'outoforder'].includes(s.toLowerCase())
+    );
+
+    const excludedBookingStatuses = Object.values(BookingStatus).filter((s) =>
+      s.toLowerCase() === 'cancelled'
+    );
+
     const rooms = await tx.room.findMany({
       where: {
         roomTypeId: data.roomId,
-        status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
+        status: { notIn: excludedRoomStatuses },
       },
       include: { roomType: true },
     });
@@ -760,7 +780,7 @@ export const createOfflineBooking = async (
       const conflict = await tx.booking.findFirst({
         where: {
           roomId: room.id,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
           AND: [
             { checkInDate: { lt: checkOutDate } },
             { checkOutDate: { gt: checkInDate } },
@@ -810,7 +830,7 @@ export const createOfflineBooking = async (
         where: {
           userId: finalUserId,
           promotionId: promo.id,
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
         },
       });
 
@@ -910,6 +930,10 @@ export const updateOfflineBooking = async (
 
     const hasDateOrRoomChange = data.roomId || data.checkInDate || data.checkOutDate;
 
+    const excludedBookingStatuses = Object.values(BookingStatus).filter((s) =>
+      s.toLowerCase() === 'cancelled'
+    );
+
     if (hasDateOrRoomChange) {
       await tx.$executeRaw`SELECT room_id FROM room WHERE room_id = ${roomId} FOR UPDATE`;
 
@@ -917,7 +941,7 @@ export const updateOfflineBooking = async (
         where: {
           roomId,
           id: { not: bookingId },
-          status: { notIn: ['cancelled'] as BookingStatus[] },
+          status: { notIn: excludedBookingStatuses },
           AND: [
             { checkInDate: { lt: checkOutDate } },
             { checkOutDate: { gt: checkInDate } },

@@ -36,6 +36,15 @@ export const initiatePayment = async (bookingId: number, userId: number) => {
   // Tính expiredAt một lần duy nhất, dùng chung cho cả 2 trường hợp
   const expiredAt = new Date(booking.createdAt.getTime() + 15 * 60 * 1000);
 
+  // BỔ SUNG: Kiểm tra nếu đã quá hạn 15 phút thì hủy đơn và chặn thanh toán
+  if (new Date() > expiredAt) {
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'cancelled', cancelReason: 'Hệ thống tự động hủy do quá hạn thanh toán 15 phút' }
+    });
+    throw new AppError(400, 'Đơn đặt phòng đã quá 15 phút. Hệ thống tự động hủy đơn, vui lòng đặt phòng mới.');
+  }
+
   // Query trực tiếp thay vì kéo toàn bộ payments về RAM rồi filter
   const existingPayment = await prisma.payment.findFirst({
     where: { bookingId, status: 'pending' },

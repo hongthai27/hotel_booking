@@ -335,12 +335,20 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
       }
     : {};
 
+  const excludedRoomStatuses = Object.values(RoomStatus).filter((s) =>
+    ['maintenance', 'out_of_order', 'outoforder'].includes(s.toLowerCase())
+  );
+
+  const excludedBookingStatuses = Object.values(BookingStatus).filter((s) =>
+    s.toLowerCase() === 'cancelled'
+  );
+
   // Thêm type annotation Prisma.RoomWhereInput
   const availableRoomCondition: Prisma.RoomWhereInput = {
-    status: { notIn: ['maintenance', 'out_of_order'] as RoomStatus[] },
+    status: { notIn: excludedRoomStatuses },
     bookings: {
       none: {
-        status: { notIn: ['cancelled'] as BookingStatus[] },
+        status: { notIn: excludedBookingStatuses },
         AND: [
           { checkInDate: { lt: checkOutDate } },
           { checkOutDate: { gt: checkInDate } },
