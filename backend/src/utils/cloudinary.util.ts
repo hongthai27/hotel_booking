@@ -22,7 +22,6 @@ export const deleteCloudinaryImage = async (imageUrl: string): Promise<void> => 
   try {
     if (!imageUrl || !imageUrl.includes('cloudinary.com')) return;
 
-    // Tự động tách URL để lấy public_id (bao gồm cả tên folder 'hotel-booking')
     const urlParts = imageUrl.split('/upload/');
     if (urlParts.length === 2) {
       const afterUpload = urlParts[1]; 

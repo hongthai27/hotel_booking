@@ -73,7 +73,6 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
     let discountAmount = 0;
     let appliedPromotionId: number | null = null;
 
-    // -- LOGIC ÁP DỤNG MÃ KHUYẾN MÃI TỪ DATABASE --
     if (data.promoCode) {
       const code = data.promoCode.toUpperCase().trim();
       const promo = await tx.promotion.findUnique({
@@ -97,7 +96,6 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
         throw new AppError(400, `Chưa đủ điều kiện: Cần đặt tối thiểu ${promo.minNights} đêm.`);
       }
 
-      // Kiểm tra mỗi user chỉ được dùng 1 lần với mã này (không tính đơn đã hủy)
       const hasUsed = await tx.booking.findFirst({
         where: {
           userId,
@@ -117,7 +115,6 @@ export const createBooking = async (data: CreateBookingDto, userId: number) => {
       totalAmount = Math.max(0, totalAmount - discountAmount);
       appliedPromotionId = promo.id;
 
-      // Cập nhật tăng số lượt sử dụng mã
       await tx.promotion.update({
         where: { id: promo.id },
         data: { usedCount: { increment: 1 } },
@@ -209,7 +206,11 @@ export const getBookingById = async (
     include: {
       room: {
         include: {
-          roomType: true
+          roomType: {
+            include: {
+              images: { take: 1, orderBy: { displayOrder: 'asc' } },
+            },
+          },
         }
       },
       payments: true,
@@ -320,7 +321,11 @@ export const getAllBookings = async (filter?: GetAllBookingsFilter) => {
         },
         room: {
           include: {
-            roomType: true,
+            roomType: {
+              include: {
+                images: { take: 1, orderBy: { displayOrder: 'asc' } },
+              },
+            },
           }
         },
         payments: {
@@ -386,7 +391,7 @@ export const cancelBooking = async (
     throw new AppError(400, `Không thể hủy đơn ở trạng thái ${booking.status}`);
   }
 
-  const canCancel = booking.status === 'confirmed' || booking.paidAt !== null;
+  const canCancel = ['confirmed', 'pending_payment'].includes(booking.status) || booking.paidAt !== null;
 
   if (!canCancel) {
     throw new AppError(400, 'Không thể hủy đơn ở trạng thái này');
@@ -507,10 +512,9 @@ export const checkIn = async (
     throw new AppError(400, `Không thể check-in đơn ở trạng thái ${booking.status}`);
   }
 
-  // Chỉ cho phép check-in vào đúng ngày (hoặc sau ngày) nhận phòng
   const now = new Date();
   const checkInDay = new Date(booking.checkInDate);
-  checkInDay.setHours(0, 0, 0, 0); // Lấy mốc 0h sáng của ngày check-in
+  checkInDay.setHours(0, 0, 0, 0);
 
   if (now.getTime() < checkInDay.getTime()) {
     throw new AppError(400, 'Chưa đến ngày nhận phòng. Không thể thao tác check-in sớm!');
@@ -524,9 +528,7 @@ export const checkIn = async (
     s.toLowerCase() === 'cancelled'
   );
 
-  // Kiểm tra xem phòng đã thực sự trống và sẵn sàng chưa
   if (booking.room.status.toLowerCase() !== 'available') {
-    // 1. Tự động tìm phòng trống khác cùng hạng
     const availableRooms = await prisma.room.findMany({
       where: {
         roomTypeId: booking.room.roomTypeId,
@@ -651,19 +653,18 @@ export const checkOut = async (
     throw new AppError(400, `Không thể check-out đơn ở trạng thái ${booking.status}`);
   }
 
-  // --- THÊM LOGIC TỰ ĐỘNG TÍNH PHỤ THU QUÁ GIỜ ---
   const now = new Date();
   const checkOutDate = new Date(booking.checkOutDate);
+  const GRACE_PERIOD_MS = 30 * 60 * 1000;
   
-  if (now > checkOutDate) {
+  if (now.getTime() - checkOutDate.getTime() > GRACE_PERIOD_MS) {
     const diffMs = now.getTime() - checkOutDate.getTime();
-    const overstayHours = Math.ceil(diffMs / (1000 * 60 * 60)); // Làm tròn lên số giờ (VD: lố 1h15p tính là 2h)
+    const overstayHours = Math.ceil(diffMs / (1000 * 60 * 60));
     
     const basePrice = Number(booking.room.roomType.basePrice);
-    const hourlyRate = basePrice * 0.1; // Phạt 10% giá phòng cho mỗi giờ
-    const overstayFee = Math.min(overstayHours * hourlyRate, basePrice); // Tối đa 100% (1 ngày)
+    const hourlyRate = basePrice * 0.1;
+    const overstayFee = Math.min(overstayHours * hourlyRate, basePrice);
 
-    // Kiểm tra xem lễ tân đã tự thêm phí quá giờ vào form chưa (tránh tính trùng)
     const alreadyHasLateFee = extraCharges.some(c => c.label.toLowerCase().includes('quá giờ') || c.label.toLowerCase().includes('trễ'));
     
     if (overstayFee > 0 && !alreadyHasLateFee) {
@@ -691,7 +692,6 @@ export const checkOut = async (
       data: { status: Object.values(RoomStatus).find(s => s.toLowerCase() === 'cleaning') || ('cleaning' as RoomStatus) },
     });
 
-    // Tạo payment record phụ thu nếu có
     if (extraTotal > 0) {
       await tx.payment.create({
         data: {
@@ -746,7 +746,7 @@ export const createOfflineBooking = async (
           fullName: data.newCustomer.fullName,
           phoneNumber: data.newCustomer.phoneNumber,
           role: 'customer',
-          email: `guest${Date.now()}@hotel.com`,
+          email: `guest${Date.now()}_${Math.random().toString(36).substring(2, 8)}@hotel.com`,
           passwordHash: 'OFFLINE_ACCOUNT',
         },
       });
@@ -1185,10 +1185,11 @@ export const getCheckOutPreview = async (bookingId: number) => {
 
   const now = new Date();
   const checkOutDate = new Date(booking.checkOutDate);
+  const GRACE_PERIOD_MS = 30 * 60 * 1000;
   let overstayHours = 0;
   let overstayFee = 0;
 
-  if (now > checkOutDate) {
+  if (now.getTime() - checkOutDate.getTime() > GRACE_PERIOD_MS) {
     const diffMs = now.getTime() - checkOutDate.getTime();
     overstayHours = Math.ceil(diffMs / (1000 * 60 * 60));
     const basePrice = Number(booking.room.roomType.basePrice);

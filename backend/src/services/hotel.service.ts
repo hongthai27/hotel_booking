@@ -11,7 +11,7 @@ interface RoomFilter {
   roomTypeId?: number;
 }
 
-// ── RoomType ───────────────────────────────────────────────────────────────────
+// RoomType 
 
 export const getAllRoomTypes = async () => {
   return prisma.roomType.findMany({
@@ -71,9 +71,6 @@ export const createRoomType = async (data: RoomTypeDto, files: Express.Multer.Fi
       if (!dataURI) return null;
       const res = await uploadImage(dataURI);
       let url = typeof res === 'string' ? res : (res as any).secure_url;
-      
-      // Tối ưu hóa dung lượng ảnh qua URL Delivery của Cloudinary
-      // Bổ sung: format auto, quality auto, giới hạn chiều rộng 1200px
       if (url && url.includes('/upload/')) {
         url = url.replace('/upload/', '/upload/f_auto,q_auto,w_1200,c_limit/');
       }
@@ -302,7 +299,6 @@ export const deleteRoomType = async (id: number, actorId: number) => {
   }
 
   return prisma.$transaction(async (tx) => {
-    // Xóa dữ liệu liên kết trước khi xóa RoomType (đề phòng lỗi Foreign Key)
     await tx.roomImage.deleteMany({ where: { roomTypeId: id } });
     await tx.roomTypeAmenity.deleteMany({ where: { roomTypeId: id } });
 
@@ -343,7 +339,6 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
     s.toLowerCase() === 'cancelled'
   );
 
-  // Thêm type annotation Prisma.RoomWhereInput
   const availableRoomCondition: Prisma.RoomWhereInput = {
     status: { notIn: excludedRoomStatuses },
     bookings: {
@@ -395,17 +390,17 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
     .sort((a, b) => a.lowestPrice - b.lowestPrice);
 };
 
-// ── Room ───────────────────────────────────────────────────────────────────────
+//Room
 
 export const getRooms = async (filter: RoomFilter) => {
   return prisma.room.findMany({
-    where: {
-      ...(filter.status && { status: filter.status }),
-      ...(filter.floor && { floor: filter.floor }),
-      ...(filter.roomTypeId && { roomTypeId: filter.roomTypeId }),
-    },
+    where: filter,
     include: {
-      roomType: true,
+      roomType: {
+        include: {
+          images: { take: 1, orderBy: { displayOrder: 'asc' } },
+        },
+      },
     },
   });
 };
@@ -453,8 +448,6 @@ export const updateRoom = async (id: number, data: Partial<RoomDto>, actorId: nu
     throw new AppError(404, 'Không tìm thấy phòng');
   }
 
-  // Không cho phép cập nhật status qua hàm này
-  // Mọi thay đổi status phải đi qua updateRoomStatus để kiểm tra booking
   const { status, ...safeData } = data;
 
   return prisma.$transaction(async (tx) => {
@@ -523,15 +516,12 @@ export const updateRoomStatus = async (
       throw new AppError(404, 'Không tìm thấy phòng');
     }
 
-    // Optimistic locking — kiểm tra version ở memory trước
     if (room.version !== currentVersion) {
       throw new AppError(
         409,
         'Trạng thái phòng vừa được thay đổi bởi nhân viên khác. Vui lòng tải lại.'
       );
     }
-
-    // Không cho chuyển sang maintenance/cleaning nếu còn booking active
     if (['maintenance', 'cleaning', 'out_of_order'].includes(newStatus)) {
       const activeBooking = await tx.booking.findFirst({
         where: {
@@ -548,7 +538,6 @@ export const updateRoomStatus = async (
       }
     }
 
-    // Khóa atomic: Đảm bảo version khớp 100% lúc chạm vào DB bằng updateMany
     const updateResult = await tx.room.updateMany({
       where: { 
         id: roomId,
@@ -556,12 +545,11 @@ export const updateRoomStatus = async (
       },
       data: {
         status: newStatus as RoomStatus,
-        version: { increment: 1 }, // Tự động tăng version
+        version: { increment: 1 },
       },
     });
 
     if (updateResult.count === 0) {
-      // Bắt lỗi nếu version bị thay đổi trong tíc tắc
       throw new AppError(
         409,
         'Trạng thái phòng vừa được thay đổi bởi nhân viên khác. Vui lòng tải lại.'
@@ -583,8 +571,6 @@ export const updateRoomStatus = async (
     return updated;
   });
 };
-
-// ── Amenity ────────────────────────────────────────────────────────────────────
 
 export const getAmenities = async () => {
   return prisma.amenity.findMany();
@@ -672,15 +658,9 @@ export interface RoomOverview {
   version: number;
 }
 
-/**
- * Lấy sơ đồ phòng tổng quan bao gồm trạng thái thực tế và thông tin khách hiện tại.
- * Phục vụ dashboard realtime cho Admin và Lễ tân.
- */
 export const getRoomOverview = async (): Promise<RoomOverview[]> => {
   try {
     const now = new Date();
-    
-    // Tạo mốc thời gian ngày hôm nay để quét các đơn đặt trước
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
@@ -696,7 +676,7 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
             OR: [
               { status: 'checked_in' },
               {
-                status: 'confirmed',
+                status: { in: ['confirmed', 'pending_payment'] },
                 checkInDate: { lte: todayEnd },
                 checkOutDate: { gt: todayStart },
               }
@@ -720,32 +700,15 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
       let finalStatus: RoomStatus | 'reserved' = room.status;
       let guestInfo: RoomGuestOverview | null = null;
 
-      // 1. Khách ĐANG Ở thực tế: Trạng thái đơn phải là 'checked_in'
-      let activeBooking = room.bookings.find((b) => b.status === 'checked_in');
+      const activeBooking = room.bookings.find((b) => b.status === 'checked_in');
 
-      // NẾU phòng đang hiện 'occupied' nhưng hệ thống không có đơn 'checked_in',
-      // rất có thể lễ tân đã đổi trạng thái phòng mà quên bấm Check-in đơn.
-      // -> Tự động tìm đơn 'confirmed' hợp lệ trong khoảng thời gian này để lấp vào!
-      if (!activeBooking && room.status === 'occupied') {
-        activeBooking = room.bookings.find(
-          (b) => b.status === 'confirmed' && 
-                 new Date(b.checkInDate) <= todayEnd && 
-                 new Date(b.checkOutDate) >= todayStart
-        );
-      }
-
-      // 2. Khách SẮP ĐẾN hôm nay: Đơn ở trạng thái 'confirmed' (chưa check-in) và loại trừ đơn đã map ở trên
       const upcomingBooking = room.bookings.find(
-        (b) => b.status === 'confirmed' && 
-               new Date(b.checkInDate) >= todayStart && 
-               new Date(b.checkInDate) <= todayEnd &&
+        (b) => ['confirmed', 'pending_payment'].includes(b.status) && 
                b.id !== activeBooking?.id
       );
 
       if (activeBooking) {
-        finalStatus = room.status === 'available' ? 'occupied' : room.status; 
-        
-        // Kiểm tra xem đã quá hạn Check-out chưa (ví dụ lố qua 12:00 trưa)
+        finalStatus = 'occupied';
         const isOverdue = now > new Date(activeBooking.checkOutDate);
 
         guestInfo = {
@@ -759,18 +722,27 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
           isOverdue,
         };
         
-      } else if (upcomingBooking && room.status === 'available') {
-        finalStatus = 'reserved';
-        guestInfo = {
-          bookingId: upcomingBooking.id,
-          guestName: upcomingBooking.customer?.fullName ?? 'Khách',
-          guestPhone: upcomingBooking.customer?.phoneNumber ?? '—',
-          checkInDate: upcomingBooking.checkInDate,
-          checkOutDate: upcomingBooking.checkOutDate,
-          guestCount: upcomingBooking.guestCount,
-          isUpcoming: true,
-          isOverdue: false,
-        };
+      } else {
+        if (room.status === 'occupied') {
+          finalStatus = 'cleaning';
+        }
+        
+        if (upcomingBooking) {
+          if (finalStatus === 'available') {
+            finalStatus = 'reserved';
+          }
+          
+          guestInfo = {
+            bookingId: upcomingBooking.id,
+            guestName: upcomingBooking.customer?.fullName ?? 'Khách',
+            guestPhone: upcomingBooking.customer?.phoneNumber ?? '—',
+            checkInDate: upcomingBooking.checkInDate,
+            checkOutDate: upcomingBooking.checkOutDate,
+            guestCount: upcomingBooking.guestCount,
+            isUpcoming: true,
+            isOverdue: false,
+          };
+        }
       }
 
       return {

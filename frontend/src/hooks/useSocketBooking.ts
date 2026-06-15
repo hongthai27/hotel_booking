@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { socketService, SOCKET_EVENTS } from '../services/socketService';
 import type { BookingStatus } from '../types/booking.types';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 interface BookingUpdatePayload {
   status: BookingStatus;
   roomId?: number;
@@ -17,23 +16,19 @@ export interface NewBookingPayload {
   checkInDate: string;
 }
 
-// ── 1. Hook dùng cho danh sách (Lịch sử khách & Danh sách Admin) ──────────────
 export const useSocketAllBookings = (bookingIds: number[] = []): void => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Đảm bảo Socket luôn được mở khi Khách hàng truy cập trang
     if (!socketService.socket.connected) {
       socketService.connect('customer');
     }
 
-    // Join vào tất cả các room đang hiện trên màn hình (dành cho User)
     bookingIds.forEach((id) => {
       if (id) socketService.joinBooking(id);
     });
 
     const handleUpdate = (_data: BookingUpdatePayload) => {
-      // Quét sạch mọi cache liên quan khi có biến động
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -47,14 +42,12 @@ export const useSocketAllBookings = (bookingIds: number[] = []): void => {
   }, [queryClient, JSON.stringify(bookingIds)]);
 };
 
-// ── 2. Hook dùng cho trang Chi tiết (Theo dõi 1 đơn duy nhất) ─────────────────
 export const useSocketBooking = (bookingId: number): void => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!bookingId) return;
 
-    // Đảm bảo Socket luôn được mở khi Khách hàng truy cập trang
     if (!socketService.socket.connected) {
       socketService.connect('customer');
     }
@@ -69,7 +62,6 @@ export const useSocketBooking = (bookingId: number): void => {
 
     socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
     
-    // Lắng nghe thêm event thanh toán cho trang chi tiết
     socketService.on(SOCKET_EVENTS.PAYMENT_CONFIRMED, () => {
       queryClient.invalidateQueries({ queryKey: ['payment', 'status', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
@@ -82,7 +74,6 @@ export const useSocketBooking = (bookingId: number): void => {
   }, [bookingId, queryClient]);
 };
 
-// ── 3. Hook lắng nghe đơn mới realtime (Dùng trong AdminLayout) ────────────────
 export const useSocketNewBooking = (
   onNewBooking: (payload: NewBookingPayload) => void
 ): void => {

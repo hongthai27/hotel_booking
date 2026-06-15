@@ -14,8 +14,6 @@ interface SuccessPayload<T> {
   meta?: PaginationMeta;
 }
 
-// Trả về response thành công với format nhất quán
-// meta chỉ được đính kèm khi có phân trang
 export const successResponse = <T>(
   res: Response,
   data: T,

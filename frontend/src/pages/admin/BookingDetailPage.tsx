@@ -1,17 +1,18 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingService } from '../../services/booking.service';
 import api from '../../services/api';
 import { toast } from 'sonner';
 import { 
-  useCheckIn, 
-  useCheckOut, 
   useCancelAdminBooking 
 } from '../../hooks/mutations/useAdminBookingMutation';
 import { formatVND, formatDate } from '../../utils/format';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Booking } from '../../types/booking.types';
+import CheckInModal from '../../components/admin/CheckInModal';
+import CheckOutModal from '../../components/admin/CheckOutModal';
 
 type BookingDetail = Booking & {
   customer?: {
@@ -180,7 +181,6 @@ const PAYMENT_MAP: Record<string, string> = {
   transfer: 'Chuyển khoản',
 };
 
-// ── COMPONENTS ──
 const DetailRow = ({ label, value, isBold = false }: { label: string; value: React.ReactNode; isBold?: boolean }) => (
   <div className="flex justify-between items-center py-1">
     <span className="text-sm text-gray-500">{label}</span>
@@ -195,20 +195,19 @@ const BookingDetailPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Hooks gọi API
+  const [checkinTarget, setCheckinTarget] = useState<any>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<any>(null);
+
+ 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-booking-detail', id],
     queryFn: () => bookingService.getById(Number(id)),
     enabled: !!id,
   });
   const booking = data as BookingDetail;
-  
-  // Hooks thao tác (Mutations)
-  const { mutate: checkIn, isPending: isCheckingIn } = useCheckIn();
-  const { mutate: checkOut, isPending: isCheckingOut } = useCheckOut();
+
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelAdminBooking();
 
-  // Mutation xác nhận hoàn tiền
   const { mutate: confirmRefund, isPending: isConfirmingRefund } = useMutation({
     mutationFn: (bookingId: number) => api.patch(`/admin/bookings/${bookingId}/confirm-refund`),
     onSuccess: () => {
@@ -221,16 +220,13 @@ const BookingDetailPage = () => {
     }
   });
 
-  // Tìm lệnh hoàn tiền
   const refundPayment = booking?.payments?.find(
     (p: any) => p.feeType === 'refund'
   );
 
-  // LOGIC MỚI: Lấy đúng giao dịch thanh toán gốc
   const bookingPayment = booking?.payments?.find((p: any) => p.feeType === 'booking') || booking?.payments?.[0];
   const PAY_METHOD = PAYMENT_MAP[bookingPayment?.method ?? booking?.paymentMethod] ?? bookingPayment?.method ?? booking?.paymentMethod ?? '—';
 
-  // HÀM MỚI: Xử lý trạng thái thanh toán thông minh
   const getPaymentStatus = () => {
     if (!booking) return { label: '—', color: 'bg-gray-100 text-gray-500' };
 
@@ -253,13 +249,12 @@ const BookingDetailPage = () => {
 
   const PAY_STATUS = getPaymentStatus();
 
-  // Biến kiểm tra điều kiện xuất PDF
   const isPaid = booking?.payments?.some((p: any) => p.status === 'success') ?? false;
 
   return (
     <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
       
-      {/* ── HEADER CÓ THÊM NÚT XUẤT PDF ── */}
+      {/*HEADER*/}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
@@ -273,7 +268,6 @@ const BookingDetailPage = () => {
           <h2 className="text-2xl font-bold text-gray-800">Chi tiết đơn đặt phòng</h2>
         </div>
 
-        {/* Nút Xuất PDF được tiêm vào đây */}
         {isPaid && (
           <button
             onClick={() => exportInvoice(booking)}
@@ -342,30 +336,20 @@ const BookingDetailPage = () => {
                 {/* Check-in (Chỉ khi đã xác nhận) */}
                 {booking.status === 'confirmed' && (
                   <button
-                    onClick={() => {
-                      if (window.confirm('Xác nhận Check-in cho khách hàng này?')) {
-                        checkIn({ id: booking.id });
-                      }
-                    }}
-                    disabled={isCheckingIn}
+                    onClick={() => setCheckinTarget(booking)}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shadow-sm shadow-green-600/20"
                   >
-                    {isCheckingIn ? 'Đang xử lý...' : 'Check-in'}
+                    Check-in
                   </button>
                 )}
 
                 {/* Check-out (Chỉ khi đang ở) */}
                 {booking.status === 'checked_in' && (
                   <button
-                    onClick={() => {
-                      if (window.confirm('Xác nhận Check-out cho khách hàng này?')) {
-                        checkOut({ id: booking.id, extraCharges: [] });
-                      }
-                    }}
-                    disabled={isCheckingOut}
+                    onClick={() => setCheckoutTarget(booking)}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shadow-sm shadow-purple-600/20"
                   >
-                    {isCheckingOut ? 'Đang xử lý...' : 'Check-out'}
+                    Check-out
                   </button>
                 )}
 
@@ -495,6 +479,24 @@ const BookingDetailPage = () => {
 
           </div>
         </div>
+      )}
+
+      {checkinTarget && (
+        <CheckInModal
+          booking={checkinTarget}
+          isOpen={!!checkinTarget}
+          onClose={() => setCheckinTarget(null)}
+          onSuccess={() => setCheckinTarget(null)}
+        />
+      )}
+
+      {checkoutTarget && (
+        <CheckOutModal
+          booking={checkoutTarget}
+          isOpen={!!checkoutTarget}
+          onClose={() => setCheckoutTarget(null)}
+          onSuccess={() => setCheckoutTarget(null)}
+        />
       )}
     </div>
   );

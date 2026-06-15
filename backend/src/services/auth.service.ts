@@ -59,7 +59,7 @@ export const login = async (data: LoginDto) => {
   });
 
   if (!user) {
-    throw new AppError(401, 'Tài khoản hoặc mật khẩu không chính xác');
+    throw new AppError(404, 'Tài khoản không tồn tại trong hệ thống');
   }
 
   if (user.status === 'inactive') {
@@ -69,7 +69,7 @@ export const login = async (data: LoginDto) => {
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isPasswordValid) {
-    throw new AppError(401, 'Tài khoản hoặc mật khẩu không chính xác');
+    throw new AppError(401, 'Mật khẩu không chính xác');
   }
 
   const token = generateToken({ userId: user.id, role: user.role });
@@ -248,7 +248,7 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   });
 };
 
-// ─── MỚI: CÁC HÀM CẬP NHẬT PROFILE ──────────────────────────────────────────
+//CÁC HÀM CẬP NHẬT PROFILE 
 
 export const updateProfile = async (
   userId: number,
@@ -282,19 +282,15 @@ export const uploadAvatar = async (
   userId: number,
   file: Express.Multer.File
 ) => {
-  let result;
-  try {
-    result = await cloudinary.uploader.upload(file.path, {
-      folder: 'hotel-booking/avatars',
-      transformation: [
-        { width: 200, height: 200, crop: 'fill', gravity: 'face' },
-      ],
-    });
-  } finally {
-    if (fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-    }
-  }
+  const b64 = Buffer.from(file.buffer).toString('base64');
+  const dataURI = "data:" + file.mimetype + ";base64," + b64;
+
+  const result = await cloudinary.uploader.upload(dataURI, {
+    folder: 'hotel-booking/avatars',
+    transformation: [
+      { width: 200, height: 200, crop: 'fill', gravity: 'face' },
+    ],
+  });
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (user?.avatarUrl) {

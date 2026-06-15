@@ -5,7 +5,6 @@ import { createAuditLog } from '../utils/audit-log.util';
 import { sendBookingConfirmationEmail } from '../utils/email.util';
 import { emitPaymentConfirmed, emitBookingUpdate, emitNewBooking } from '../utils/socket.util';
 
-// Tạo QR payload giả lập, chứa thông tin giao dịch để frontend hiển thị mã QR
 const buildQrPayload = (
   transactionRef: string,
   amount: number,
@@ -33,10 +32,8 @@ export const initiatePayment = async (bookingId: number, userId: number) => {
     throw new AppError(400, 'Đơn đặt phòng không ở trạng thái chờ thanh toán');
   }
 
-  // Tính expiredAt một lần duy nhất, dùng chung cho cả 2 trường hợp
   const expiredAt = new Date(booking.createdAt.getTime() + 15 * 60 * 1000);
 
-  // BỔ SUNG: Kiểm tra nếu đã quá hạn 15 phút thì hủy đơn và chặn thanh toán
   if (new Date() > expiredAt) {
     await prisma.booking.update({
       where: { id: bookingId },
@@ -45,12 +42,10 @@ export const initiatePayment = async (bookingId: number, userId: number) => {
     throw new AppError(400, 'Đơn đặt phòng đã quá 15 phút. Hệ thống tự động hủy đơn, vui lòng đặt phòng mới.');
   }
 
-  // Query trực tiếp thay vì kéo toàn bộ payments về RAM rồi filter
   const existingPayment = await prisma.payment.findFirst({
     where: { bookingId, status: 'pending' },
   });
 
-  // Tạo payment mới nếu chưa có, dùng lại nếu đã có
   const payment = existingPayment ?? await prisma.payment.create({
     data: {
       bookingId,
@@ -84,7 +79,6 @@ export const getPaymentStatus = async (bookingId: number, userId: number) => {
     throw new AppError(404, 'Không tìm thấy đơn đặt phòng');
   }
 
-  // Lấy payment mới nhất, có thể null nếu chưa tạo payment
   const payment = await prisma.payment.findFirst({
     where: { bookingId },
     orderBy: { createdAt: 'desc' },
@@ -106,13 +100,6 @@ export const simulateSuccess = async (transactionRef: string) => {
     throw new AppError(404, 'Không tìm thấy giao dịch');
   }
 
-  if (payment.status !== 'pending') {
-    return {
-      message: 'Giao dịch đã được xử lý trước đó',
-      status: payment.status,
-    };
-  }
-
   const booking = await prisma.booking.findUnique({
     where: { id: payment.bookingId },
     include: {
@@ -127,16 +114,26 @@ export const simulateSuccess = async (transactionRef: string) => {
     throw new AppError(404, 'Không tìm thấy đơn đặt phòng liên quan');
   }
 
-  await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const oldPayment = { ...payment };
 
-    const updatedPayment = await tx.payment.update({
-      where: { transactionRef },
+    const updateResult = await tx.payment.updateMany({
+      where: { 
+        transactionRef,
+        status: 'pending'
+      },
       data: {
         status: 'success',
         paidAt: new Date(),
       },
     });
+
+    if (updateResult.count === 0) {
+      const current = await tx.payment.findUnique({ where: { transactionRef } });
+      return { processed: true, message: 'Giao dịch đã được xử lý trước đó', status: current?.status };
+    }
+
+    const updatedPayment = await tx.payment.findUniqueOrThrow({ where: { transactionRef } });
 
     await tx.booking.update({
       where: { id: payment.bookingId },
@@ -152,15 +149,21 @@ export const simulateSuccess = async (transactionRef: string) => {
       oldValue: oldPayment,
       newValue: updatedPayment,
     });
+    
+    return { processed: false };
   });
 
-  // PHÁT SỰ KIỆN SOCKET CHO KHÁCH HÀNG
+  if (result.processed) {
+    return {
+      message: result.message,
+      status: result.status,
+    };
+  }
+
   emitPaymentConfirmed(payment.bookingId);
   emitBookingUpdate(payment.bookingId, { status: 'confirmed' });
 
-  // GỬI EMAIL & PHÁT SỰ KIỆN SOCKET CHO LỄ TÂN/ADMIN
   if (booking?.customer) {
-    // Báo đơn mới lên hệ thống nội bộ
     emitNewBooking({
       bookingId: booking.id,
       roomTypeName: booking.room.roomType.typeName,
@@ -168,11 +171,9 @@ export const simulateSuccess = async (transactionRef: string) => {
       checkInDate: booking.checkInDate,
     });
 
-    // Fire and forget - Không block luồng response
     void sendBookingConfirmationEmail(
       {
         ...booking,
-        // Truyền đích danh tên hạng phòng và số phòng ra ngoài để template Email dễ đọc
         roomName: booking.room.roomType.typeName,
         roomTypeName: booking.room.roomType.typeName,
         roomNumber: booking.room.roomNumber,
@@ -198,10 +199,16 @@ export const confirmRefund = async (paymentId: number, actorId: number) => {
   }
 
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.payment.update({
-      where: { id: paymentId },
+    const updateResult = await tx.payment.updateMany({
+      where: { id: paymentId, status: 'pending_refund' },
       data: { status: 'refunded', refundedAt: new Date() },
     });
+
+    if (updateResult.count === 0) {
+      throw new AppError(400, 'Giao dịch đã được xử lý hoặc không còn ở trạng thái chờ hoàn tiền');
+    }
+
+    const updated = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
 
     await createAuditLog({
       tx,
@@ -215,4 +222,35 @@ export const confirmRefund = async (paymentId: number, actorId: number) => {
 
     return updated;
   });
+};
+
+export const simulateFailure = async (transactionRef: string) => {
+  const payment = await prisma.payment.findUnique({
+    where: { transactionRef },
+  });
+
+  if (!payment) {
+    throw new AppError(404, 'Không tìm thấy giao dịch');
+  }
+
+  const updateResult = await prisma.payment.updateMany({
+    where: { 
+      transactionRef,
+      status: 'pending'
+    },
+    data: { status: 'failed' },
+  });
+
+  if (updateResult.count === 0) {
+    const current = await prisma.payment.findUnique({ where: { transactionRef } });
+    return {
+      message: 'Giao dịch đã được xử lý trước đó',
+      status: current?.status,
+    };
+  }
+
+  return {
+    message: 'Giả lập thanh toán thất bại',
+    status: 'failed',
+  };
 };

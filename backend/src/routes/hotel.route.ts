@@ -13,11 +13,10 @@ import * as hotelController from '../controllers/hotel.controller';
 
 const router = Router();
 
-// Cấu hình Multer để upload ảnh
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
+    fileSize: 5 * 1024 * 1024,
     files: 10,
   },
   fileFilter: (req: any, file: any, cb: any) => {
@@ -30,7 +29,7 @@ const upload = multer({
   },
 }) as any;
 
-// ── Public Routes ─────────────────────────────────────────────────────────────
+//  Public Routes 
 
 router.get(
   '/hotels/available',
@@ -38,14 +37,13 @@ router.get(
   hotelController.searchAvailable
 );
 
-// Dat truoc cac route co params de tranh conflict
 router.get('/hotels/room-types', hotelController.getAllRoomTypesPublic);
 
 router.get('/hotels/:roomTypeId', hotelController.getRoomTypeById);
 
 router.get('/hotels', hotelController.getAllRoomTypes);
 
-// ── Admin - Room Types ────────────────────────────────────────────────────────
+//Admin - Room Types
 
 router.get(
   '/admin/room-types',
@@ -79,7 +77,7 @@ router.delete(
   hotelController.deleteRoomType
 );
 
-// ── Admin - Rooms (QUẢN LÝ PHÒNG) ─────────────────────────────────────────────
+//Admin - Rooms (QUẢN LÝ PHÒNG)
 
 router.get(
   '/admin/rooms',
@@ -126,7 +124,7 @@ router.delete(
   hotelController.deleteRoom
 );
 
-// ── Admin - Amenities (TIỆN ÍCH) ──────────────────────────────────────────────
+//Admin - Amenities (TIỆN ÍCH) 
 
 router.get(
   '/admin/amenities',

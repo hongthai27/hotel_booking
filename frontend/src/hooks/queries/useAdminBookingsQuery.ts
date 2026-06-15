@@ -24,12 +24,11 @@ export const useRevenueReport = (from: string, to: string) => {
   });
 };
 
-// ── Sơ đồ phòng Realtime ──
+//Sơ đồ phòng Realtime 
 export const useRoomOverview = () => {
   return useQuery({
     queryKey: ['admin', 'rooms', 'overview'],
     queryFn: () => adminService.getRoomOverview(),
-    // Tự động fetch lại mỗi 30 giây để cập nhật trạng thái phòng mới nhất
     refetchInterval: 30000, 
   });
 };

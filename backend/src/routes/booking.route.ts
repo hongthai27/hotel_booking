@@ -13,14 +13,14 @@ import {
 
 const router = Router();
 
-// ── Hotels: Public Reviews ──────────────────────────────────────────────────
+//Hotels: Public Reviews
 
 router.get(
   '/hotels/:roomTypeId/reviews',
   bookingController.getReviewsByRoomType
 );
 
-// ── Customer: Bookings & Reviews ───────────────────────────────────────────
+// Customer: Bookings & Reviews 
 
 router.get('/bookings/my', authenticateJWT, bookingController.getMyBookings);
 
@@ -55,7 +55,7 @@ router.post(
   bookingController.createReview
 );
 
-// ── Admin: Bookings ────────────────────────────────────────────────────────────
+//Admin: Bookings 
 
 router.get(
   '/admin/bookings',
@@ -109,7 +109,7 @@ router.get(
   bookingController.getBookingById
 );
 
-// ── Admin: Refunds & Reports ─────────────────────────────────────────────────────
+// Admin: Refunds & Reports
 
 router.get(
   '/admin/refunds',

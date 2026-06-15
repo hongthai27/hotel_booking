@@ -43,7 +43,6 @@ const envSchema = z.object({
     .string({ required_error: 'CLOUDINARY_API_SECRET là bắt buộc' })
     .min(1, 'CLOUDINARY_API_SECRET không được để trống'),
 
-  // Email
   EMAIL_HOST: z
     .string({ required_error: 'EMAIL_HOST là bắt buộc' })
     .min(1, 'EMAIL_HOST không được để trống'),
@@ -62,7 +61,6 @@ const envSchema = z.object({
     .string({ required_error: 'EMAIL_PASS là bắt buộc' })
     .min(1, 'EMAIL_PASS không được để trống'),
 
-  // Webhook
   WEBHOOK_SECRET: z
     .string({ required_error: 'WEBHOOK_SECRET là bắt buộc' })
     .min(16, 'WEBHOOK_SECRET phải có ít nhất 16 ký tự'),
@@ -76,7 +74,6 @@ const envSchema = z.object({
 
 const parsed = envSchema.safeParse(process.env);
 
-// Nếu validate thất bại, log rõ từng lỗi và dừng server ngay lập tức
 if (!parsed.success) {
   console.error('Environment validation failed:');
 
@@ -91,5 +88,4 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-// Export type để dùng ở nơi khác nếu cần
 export type Env = typeof env;

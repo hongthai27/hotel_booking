@@ -6,8 +6,6 @@ import { emitBookingUpdate } from '../utils/socket.util';
 
 const PAYMENT_EXPIRY_MINUTES = 15;
 const CANCEL_REASON = 'Hết thời gian thanh toán';
-
-// Đã sửa thành 0 theo đúng chuẩn System Actor
 const SYSTEM_ACTOR_ID = 0; 
 
 const cancelExpiredBookings = async (): Promise<void> => {
@@ -29,11 +27,9 @@ const cancelExpiredBookings = async (): Promise<void> => {
 
   for (const booking of expiredBookings) {
     try {
-      // Biến lưu trữ kết quả để dùng bên ngoài transaction
       let updatedBooking; 
 
       await prisma.$transaction(async (tx) => {
-        // 1. Cập nhật trạng thái đơn hàng
         updatedBooking = await tx.booking.update({
           where: { id: booking.id },
           data: {
@@ -55,7 +51,6 @@ const cancelExpiredBookings = async (): Promise<void> => {
         });
       });
 
-      // CHỈ BẮN SOCKET KHI TRANSACTION ĐÃ THÀNH CÔNG (NẰM NGOÀI KHỐI TX)
       if (updatedBooking) {
         emitBookingUpdate(booking.id, {
           status: 'cancelled',

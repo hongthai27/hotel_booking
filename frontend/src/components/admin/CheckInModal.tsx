@@ -36,8 +36,7 @@ const CheckInModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
       onSuccess();
       onClose();
     } catch {
-      // lỗi được xử lý trong mutation onError
-    }
+     }
   };
 
   const handleClose = () => {

@@ -30,3 +30,13 @@ export const simulateSuccess = catchAsync(async (req: Request, res: Response) =>
   const data = await paymentService.simulateSuccess(req.body.transactionRef);
   successResponse(res, data, 'Giả lập thanh toán thành công');
 });
+
+export const simulateFailure = catchAsync(async (req: Request, res: Response) => {
+  // Chỉ cho phép giả lập thanh toán ở môi trường development
+  if (env.NODE_ENV === 'production') {
+    throw new AppError(403, 'Không cho phép trong môi trường production');
+  }
+
+  const data = await paymentService.simulateFailure(req.body.transactionRef);
+  successResponse(res, data, 'Giả lập thanh toán thất bại');
+});

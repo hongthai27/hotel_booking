@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRoomOverview } from '../../hooks/queries/useAdminBookingsQuery';
 import { useSocketAllBookings } from '../../hooks/useSocketBooking';
 import { formatVND, formatDate } from '../../utils/format';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../../services/api';
+import CheckInModal from '../../components/admin/CheckInModal';
+import CheckOutModal from '../../components/admin/CheckOutModal';
 
 export interface RoomGuestOverview {
   bookingId: number;
@@ -67,6 +70,8 @@ interface RoomCardProps {
   cfg: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG];
   onStatusChange: (roomId: number, status: 'available' | 'maintenance', version: number) => void;
   isUpdating: boolean;
+  onCheckIn: (booking: any) => void;
+  onCheckOut: (booking: any) => void;
 }
 
 const RoomCard: React.FC<RoomCardProps> = ({
@@ -74,9 +79,12 @@ const RoomCard: React.FC<RoomCardProps> = ({
   cfg,
   onStatusChange,
   isUpdating,
+  onCheckIn,
+  onCheckOut,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const isOverdue = room.currentGuest?.isOverdue;
+  const navigate = useNavigate();
 
   return (
     <div
@@ -168,6 +176,59 @@ const RoomCard: React.FC<RoomCardProps> = ({
                   : `Trả phòng: ${formatDate(room.currentGuest.checkOutDate)} (Trước 12:00)`
                 }
               </div>
+
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/admin/bookings/${room.currentGuest!.bookingId}`);
+                    setShowTooltip(false);
+                  }}
+                  className="flex-1 text-center font-bold text-[11px] py-1.5 rounded-lg transition-all text-primary bg-primary/10 hover:bg-primary/20"
+                >
+                  Chi tiết đơn
+                </button>
+
+                {room.status === 'occupied' ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCheckOut({
+                        id: room.currentGuest!.bookingId,
+                        status: 'checked_in',
+                        customer: { fullName: room.currentGuest!.guestName, phoneNumber: room.currentGuest!.guestPhone },
+                        room: { roomNumber: room.roomNumber, roomType: { typeName: room.typeName } },
+                        checkInDate: room.currentGuest!.checkInDate,
+                        checkOutDate: room.currentGuest!.checkOutDate,
+                      });
+                      setShowTooltip(false);
+                    }}
+                    className={`flex-1 text-center font-bold text-[11px] py-1.5 rounded-lg transition-all text-white shadow-sm ${
+                      isOverdue ? 'bg-red-600 hover:bg-red-700' : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
+                  >
+                    Check-out
+                  </button>
+                ) : room.currentGuest.isUpcoming ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCheckIn({
+                        id: room.currentGuest!.bookingId,
+                        status: 'confirmed',
+                        customer: { fullName: room.currentGuest!.guestName, phoneNumber: room.currentGuest!.guestPhone },
+                        room: { roomNumber: room.roomNumber, roomType: { typeName: room.typeName } },
+                        checkInDate: room.currentGuest!.checkInDate,
+                        checkOutDate: room.currentGuest!.checkOutDate,
+                      });
+                      setShowTooltip(false);
+                    }}
+                    className="flex-1 text-center font-bold text-[11px] py-1.5 rounded-lg transition-all text-white bg-green-600 hover:bg-green-700 shadow-sm"
+                  >
+                    Check-in
+                  </button>
+                ) : null}
+              </div>
             </div>
           )}
 
@@ -198,6 +259,8 @@ const RoomCard: React.FC<RoomCardProps> = ({
 const DashboardPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data, isLoading } = useRoomOverview();
+  const [checkinTarget, setCheckinTarget] = useState<any>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<any>(null);
   
   const rooms = (data || []) as RoomOverview[];
 
@@ -206,9 +269,7 @@ const DashboardPage: React.FC = () => {
     mutationFn: ({ roomId, status, version }: { roomId: number; status: 'available' | 'maintenance', version: number }) => 
       api.patch(`/admin/rooms/${roomId}/status`, { status, version }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      queryClient.invalidateQueries();
       
       if (variables.status === 'maintenance') {
         toast.error('Đã chuyển phòng sang trạng thái bảo trì.');
@@ -295,6 +356,8 @@ const DashboardPage: React.FC = () => {
                       cfg={cfg} 
                 onStatusChange={(id, stat, version) => updateStatus({ roomId: id, status: stat, version })}
                       isUpdating={isUpdatingStatus}
+                      onCheckIn={setCheckinTarget}
+                      onCheckOut={setCheckoutTarget}
                     />
                   );
                 })}
@@ -302,6 +365,24 @@ const DashboardPage: React.FC = () => {
             </div>
           ))}
       </div>
+
+      {checkinTarget && (
+        <CheckInModal
+          booking={checkinTarget}
+          isOpen={!!checkinTarget}
+          onClose={() => setCheckinTarget(null)}
+          onSuccess={() => setCheckinTarget(null)}
+        />
+      )}
+
+      {checkoutTarget && (
+        <CheckOutModal
+          booking={checkoutTarget}
+          isOpen={!!checkoutTarget}
+          onClose={() => setCheckoutTarget(null)}
+          onSuccess={() => setCheckoutTarget(null)}
+        />
+      )}
     </div>
   );
 };

@@ -5,8 +5,11 @@ import bookingRouter from './booking.route';
 import paymentRouter from './payment.route';
 import promotionRouter from './promotion.route';
 import adminRouter from './admin.routes';
+import { startCronJobs } from '../services/cron.service';
 
 export const router = Router();
+
+startCronJobs();
 
 router.get('/health', (_req: Request, res: Response): void => {
   res.status(200).json({ success: true, message: 'Server is running' });

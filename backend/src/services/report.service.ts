@@ -78,6 +78,34 @@ export const getRevenueReport = async (from: string, to: string) => {
       ? Math.round((usedNights / (totalRooms * totalDays)) * 10000) / 100
       : 0;
 
+  const paymentsWithRoomType = await prisma.payment.findMany({
+    where: {
+      status: 'success',
+      paidAt: {
+        gte: fromDate,
+        lte: toDate,
+      },
+    },
+    select: {
+      amount: true,
+      booking: {
+        select: {
+          room: { select: { roomType: { select: { typeName: true } } } },
+        },
+      },
+    },
+  });
+
+  const roomTypeMap: Record<string, number> = {};
+  for (const payment of paymentsWithRoomType) {
+    const typeName = payment.booking?.room?.roomType?.typeName || 'Chưa xếp phòng';
+    roomTypeMap[typeName] = (roomTypeMap[typeName] || 0) + Number(payment.amount);
+  }
+
+  const byRoomType = Object.entries(roomTypeMap)
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue);
+
   return {
     summary: {
       totalRevenue,
@@ -93,6 +121,7 @@ export const getRevenueReport = async (from: string, to: string) => {
       penaltyRevenue: Number(item.penaltyRevenue),
       bookingCount: Number(item.bookingCount),
     })),
+    byRoomType,
   };
 };
 

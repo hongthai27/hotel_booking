@@ -71,12 +71,17 @@ export const getPublicPromotions = catchAsync(async (req: Request, res: Response
 export const createPromotion = catchAsync(async (req: Request, res: Response) => {
   const data = req.body;
   
-  const existing = await prisma.promotion.findUnique({ where: { code: data.code } });
+  if (!data || !data.code || typeof data.code !== 'string') {
+    throw new AppError(400, 'Vui lòng nhập mã ưu đãi hợp lệ');
+  }
+
+  const code = data.code.toUpperCase().trim();
+  const existing = await prisma.promotion.findUnique({ where: { code } });
   if (existing) throw new AppError(400, 'Mã ưu đãi này đã tồn tại');
 
   const promotion = await prisma.promotion.create({
     data: {
-      code: data.code.toUpperCase().trim(),
+      code,
       type: data.type,
       value: data.value,
       minNights: data.minNights,
@@ -97,15 +102,16 @@ export const updatePromotion = catchAsync(async (req: Request, res: Response) =>
   const existing = await prisma.promotion.findUnique({ where: { id } });
   if (!existing) throw new AppError(404, 'Không tìm thấy mã ưu đãi');
 
-  if (data.code && data.code.toUpperCase().trim() !== existing.code) {
-    const codeExists = await prisma.promotion.findUnique({ where: { code: data.code.toUpperCase().trim() } });
+  if (data.code && typeof data.code === 'string' && data.code.toUpperCase().trim() !== existing.code) {
+    const code = data.code.toUpperCase().trim();
+    const codeExists = await prisma.promotion.findUnique({ where: { code } });
     if (codeExists) throw new AppError(400, 'Mã ưu đãi này đã tồn tại');
   }
 
   const promotion = await prisma.promotion.update({
     where: { id },
     data: {
-      ...(data.code && { code: data.code.toUpperCase().trim() }),
+      ...(data.code && typeof data.code === 'string' && { code: data.code.toUpperCase().trim() }),
       ...(data.type && { type: data.type }),
       ...(data.value !== undefined && { value: data.value }),
       ...(data.minNights !== undefined && { minNights: data.minNights }),

@@ -19,7 +19,7 @@ const ReviewForm = ({ bookingId, onSuccess }: ReviewFormProps) => {
       api.post(`/bookings/${bookingId}/review`, { rating, comment }),
     onSuccess: () => {
       toast.success('Cảm ơn bạn đã đánh giá!');
-      queryClient.invalidateQueries(); // Xóa toàn bộ cache để các trang tự cập nhật
+      queryClient.invalidateQueries(); 
       onSuccess?.();
     },
     onError: (err: any) => {

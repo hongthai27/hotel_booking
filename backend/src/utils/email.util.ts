@@ -15,7 +15,6 @@ export interface UserEmailData {
   email: string;
 }
 
-// Khởi tạo transporter một lần, tái sử dụng cho mỗi lần gửi
 const transporter = nodemailer.createTransport({
   host: env.EMAIL_HOST,
   port: env.EMAIL_PORT,

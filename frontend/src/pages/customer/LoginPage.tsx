@@ -54,18 +54,7 @@ const LoginPage: React.FC = () => {
       }
       
     } catch (error: any) {
-      let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
-      if (
-        error?.response?.status === 400 || 
-        error?.response?.status === 401 || 
-        error?.response?.status === 404
-      ) {
-        errorMessage = 'Sai thông tin đăng nhập. Vui lòng kiểm tra lại!';
-      } 
-      // Bắt các lỗi cụ thể khác nếu có
-      else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
+      const errorMessage = error?.response?.data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
 
       setLoginError(errorMessage);
       toast.error(errorMessage);
@@ -83,11 +72,11 @@ const LoginPage: React.FC = () => {
 
       {/* Khung báo lỗi từ Server */}
       {loginError && (
-        <div className="mb-5 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 animate-fade-in">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="mb-5 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 animate-fade-in">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span>{loginError}</span>
+          <span className="font-medium">{loginError}</span>
         </div>
       )}
 

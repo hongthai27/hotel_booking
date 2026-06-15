@@ -22,11 +22,9 @@ const RefundListPage = () => {
 
   useEffect(() => {
     const handleUpdate = () => {
-      // Khi có người hủy phòng, tự động tải lại danh sách hoàn tiền
       void queryClient.invalidateQueries({ queryKey: ['admin', 'refunds'] });
     };
 
-    // Gọi đúng tên biến socketService và tên sự kiện BOOKING_UPDATED
     socketService.on(SOCKET_EVENTS.BOOKING_UPDATED, handleUpdate);
 
     return () => {

@@ -6,7 +6,7 @@ import { RoomStatus } from '@prisma/client';
 import { SearchAvailableDto } from '../validations/hotel.schema';
 import { AppError } from '../utils/app-error.util';
 
-// ── RoomType ───────────────────────────────────────────────────────────────────
+// RoomType
 
 export const getAllRoomTypes = catchAsync(async (req: Request, res: Response) => {
   const roomTypes = await hotelService.getAllRoomTypes();
@@ -106,7 +106,7 @@ export const deleteRoomType = catchAsync(async (req: Request, res: Response) => 
   successResponse(res, null, 'Xóa loại phòng thành công');
 });
 
-// ── Room ───────────────────────────────────────────────────────────────────────
+//Room 
 
 export const getRooms = catchAsync(async (req: Request, res: Response) => {
   const floor = Number(req.query.floor);
@@ -158,7 +158,7 @@ export const deleteRoom = catchAsync(async (req: Request, res: Response) => {
   successResponse(res, null, 'Xóa phòng thành công');
 });
 
-// ── Search ─────────────────────────────────────────────────────────────────────
+//Search
 
 export const searchAvailable = catchAsync(async (req: Request, res: Response) => {
   const results = await hotelService.searchAvailable(
@@ -173,7 +173,7 @@ export const searchAvailable = catchAsync(async (req: Request, res: Response) =>
   successResponse(res, results, 'Tìm kiếm phòng thành công');
 });
 
-// ── Amenity ────────────────────────────────────────────────────────────────────
+//Amenity 
 
 export const getAmenities = catchAsync(async (req: Request, res: Response) => {
   const amenities = await hotelService.getAmenities();
@@ -190,8 +190,7 @@ export const deleteAmenity = catchAsync(async (req: Request, res: Response) => {
   successResponse(res, null, 'Xóa tiện ích thành công');
 });
 
-// ── Dashboard / Sơ đồ phòng ────────────────────────────────────────────────────
-
+// Dashboard / Sơ đồ phòng 
 export const getRoomOverview = catchAsync(async (req: Request, res: Response) => {
   const rooms = await hotelService.getRoomOverview();
   successResponse(res, rooms, 'Lấy sơ đồ phòng tổng quan thành công');

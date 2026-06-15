@@ -66,7 +66,7 @@ const CheckOutModal = ({ booking, isOpen, onClose, onSuccess }: Props) => {
       onSuccess();
       handleClose();
     } catch {
-      // lỗi được xử lý trong mutation onError
+
     }
   };
 

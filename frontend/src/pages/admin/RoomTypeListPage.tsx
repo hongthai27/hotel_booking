@@ -401,9 +401,7 @@ const RoomFormModal = ({
         ? api.put(`/admin/rooms/${defaultValues.id}`, data)
         : api.post('/admin/rooms', { ...data, roomTypeId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      queryClient.invalidateQueries();
       toast.success(defaultValues ? 'Cập nhật phòng thành công' : 'Thêm phòng thành công');
       onClose();
     },
@@ -491,9 +489,7 @@ const RoomTypeListPage = () => {
     mutationFn: ({ id, status, version }: { id: number; status: string; version: number }) => 
       api.patch(`/admin/rooms/${id}/status`, { status, version }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      queryClient.invalidateQueries();
       toast.success('Cập nhật trạng thái phòng thành công');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật'),
@@ -502,9 +498,7 @@ const RoomTypeListPage = () => {
   const deleteRoomMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/admin/rooms/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-room-types'] });
+      queryClient.invalidateQueries();
       toast.success('Xóa phòng thành công');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Không thể xóa phòng này'),

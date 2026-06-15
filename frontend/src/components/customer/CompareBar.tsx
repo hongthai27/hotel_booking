@@ -12,7 +12,6 @@ const CompareBar = () => {
 
   if (items.length === 0) return null;
 
-  // Chỉ hiển thị thanh so sánh ở trang danh sách phòng
   if (location.pathname !== '/rooms') return null;
 
   return (

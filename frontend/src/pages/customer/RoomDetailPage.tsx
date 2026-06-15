@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useRoomTypeDetail } from '../../hooks/queries/use-hotels.query';
 import { useAuthStore } from '../../stores/authStore';
+import { useSearchStore } from '../../stores/searchStore';
 import { ReviewList } from '../../components/customer/ReviewList';
 
 const PLACEHOLDER = 'https://placehold.co/800x500?text=No+Image';
@@ -26,12 +27,17 @@ const RoomDetailPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const searchStore = useSearchStore();
 
-  const checkIn = searchParams.get('checkIn') ?? '';
-  const checkOut = searchParams.get('checkOut') ?? '';
-  const guests = searchParams.get('guests') ?? '1';
+  const checkIn = searchParams.get('checkIn') || searchStore.checkIn || '';
+  const checkOut = searchParams.get('checkOut') || searchStore.checkOut || '';
+  const guests = searchParams.get('guests') || searchStore.guests?.toString() || '1';
 
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const { data: roomType, isLoading, isError } = useRoomTypeDetail(
     Number(roomTypeId)
@@ -55,7 +61,7 @@ const RoomDetailPage = () => {
     setActiveIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
 
   const handleBook = () => {
-    if (!checkIn || !checkOut) {
+    if (!checkIn || !checkOut || nights <= 0) {
       alert('Vui lòng chọn ngày nhận và trả phòng ở trang chủ trước khi đặt!');
       return;
     }
@@ -256,15 +262,19 @@ const RoomDetailPage = () => {
                   <span className="text-gray-500">Thời gian lưu trú</span>
                   <span className="text-gray-800 font-medium">{nights} đêm</span>
                 </div>
-                <hr className="border-gray-100 my-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Số khách</span>
+                  <span className="text-gray-800 font-medium">{guests} khách</span>
+                </div>
+                <hr className="border-gray-200 my-1" />
                 <div className="flex justify-between items-center font-semibold text-base">
                   <span className="text-gray-800">Tổng cộng</span>
                   <span className="text-primary">{formatVND(total)}</span>
                 </div>
               </div>
             ) : (
-              <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 leading-relaxed">
-                Vui lòng chọn ngày nhận và trả phòng tại trang chủ để xem chi tiết giá tiền dự kiến.
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 leading-relaxed text-center">
+                Vui lòng chọn ngày nhận và trả phòng tại trang chủ trước khi đặt!
               </div>
             )}
 

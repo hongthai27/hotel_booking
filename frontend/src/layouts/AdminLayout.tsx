@@ -23,7 +23,6 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Notification state ─────────────────────────────────────────────────────
   const [notifications, setNotifications] = useState<NewBookingPayload[]>([]);
   const [showNotif, setShowNotif] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -33,12 +32,11 @@ const AdminLayout = () => {
 
   const isAdmin = user?.role === 'admin';
 
-  // ── Socket listener ────────────────────────────────────────────────────────
+ 
   const handleNewBooking = useCallback((payload: NewBookingPayload) => {
     setNotifications((prev) => [payload, ...prev].slice(0, 20));
     setUnreadCount((prev) => prev + 1);
 
-    // Âm thanh thông báo nhẹ
     try {
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
@@ -55,7 +53,6 @@ const AdminLayout = () => {
 
   useSocketNewBooking(handleNewBooking);
 
-  // ── Click outside đóng dropdown ──
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {

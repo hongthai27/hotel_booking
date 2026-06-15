@@ -26,4 +26,10 @@ router.post(
   paymentController.simulateSuccess
 );
 
+router.post(
+  '/payments/simulate-failure',
+  validateBody(simulatePaymentSchema), 
+  paymentController.simulateFailure
+);
+
 export default router;

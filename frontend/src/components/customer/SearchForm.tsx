@@ -7,7 +7,6 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { useEffect } from 'react';
 import { useSearchStore } from '../../stores/searchStore';
 
-// --- CÁC HÀM TIỆN ÍCH ---
 const getToday = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -16,20 +15,17 @@ const getToday = () => {
   return `${year}-${month}-${day}`;
 };
 
-// Hàm thêm dấu chấm vào số (VD: 500000 -> "500.000")
 const formatCurrency = (value: number | undefined | null) => {
   if (value === undefined || value === null || isNaN(value)) return '';
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
-// Hàm chuyển text có dấu chấm về lại số nguyên (VD: "500.000" -> 500000)
 const parseCurrency = (value: string) => {
-  const numericString = value.replace(/\D/g, ''); // Chỉ giữ lại các chữ số, bỏ mọi ký tự khác
+  const numericString = value.replace(/\D/g, '');
   if (!numericString) return undefined;
   return parseInt(numericString, 10);
 };
 
-// --- SCHEMA KIỂM TRA DỮ LIỆU ---
 const buildSearchSchema = (today: string) =>
   z.object({
     checkIn: z
@@ -51,7 +47,6 @@ const buildSearchSchema = (today: string) =>
     message: 'Ngày trả phòng phải sau ngày nhận phòng',
     path: ['checkOut'],
   })
-  // THÊM LOGIC: Kiểm tra Giá đến phải lớn hơn Giá từ
   .refine((d) => {
     if (d.minPrice !== undefined && d.maxPrice !== undefined) {
       return d.maxPrice >= d.minPrice;
@@ -64,12 +59,10 @@ const buildSearchSchema = (today: string) =>
 
 type SearchFormValues = z.infer<ReturnType<typeof buildSearchSchema>>;
 
-// --- BỔ SUNG: Interface cho Props ---
 interface SearchFormProps {
   compact?: boolean;
 }
 
-// --- BỔ SUNG: Helper class cho input ---
 const inputClass = (compact: boolean) =>
   `border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors w-full ${
     compact ? 'text-xs' : 'text-sm'
@@ -142,7 +135,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
     navigate(`/rooms?${params.toString()}`);
   };
 
-  // --- BỔ SUNG: Render giao diện Compact ---
   if (compact) {
     return (
       <form
@@ -205,13 +197,11 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
     );
   }
 
-  // --- GIỮ NGUYÊN: Render giao diện đầy đủ mặc định ---
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
       className="bg-white rounded-2xl p-5 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-start"
     >
-      {/* Ngày nhận phòng */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-800">Ngày nhận phòng</label>
         <Controller
@@ -232,7 +222,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
         {errors.checkIn && <p className="text-red-500 text-xs mt-1">{errors.checkIn.message}</p>}
       </div>
 
-      {/* Ngày trả phòng */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-800">Ngày trả phòng</label>
         <Controller
@@ -253,7 +242,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
         {errors.checkOut && <p className="text-red-500 text-xs mt-1">{errors.checkOut.message}</p>}
       </div>
 
-      {/* Số khách */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-800">Số khách</label>
         <input
@@ -266,7 +254,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
         {errors.guests && <p className="text-red-500 text-xs mt-1">{errors.guests.message}</p>}
       </div>
 
-      {/* Khối Lọc Giá (Tự động format có dấu chấm) */}
       <div className="grid grid-cols-2 gap-3 relative">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-800 line-clamp-1">Giá từ (VNĐ)</label>
@@ -305,7 +292,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
           />
         </div>
         
-        {/* Hiển thị lỗi nếu Giá đến < Giá từ */}
         {errors.maxPrice && (
           <p className="text-red-500 text-xs absolute -bottom-5 left-0 w-full whitespace-nowrap">
             {errors.maxPrice.message}
@@ -313,7 +299,6 @@ const SearchForm = ({ compact = false }: SearchFormProps) => {
         )}
       </div>
 
-      {/* Nút Tìm Kiếm */}
       <div className="flex items-end h-full pt-[28px]">
         <button
           type="submit"
