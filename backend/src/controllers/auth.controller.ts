@@ -3,6 +3,8 @@ import * as authService from '../services/auth.service';
 import { successResponse } from '../utils/response.util';
 import { catchAsync } from '../utils/catch-async.util';
 import { AppError } from '../utils/app-error.util';
+import { prisma } from '../utils/prisma.util';
+import { uploadImage } from '../utils/cloudinary.util';
 
 export const register = catchAsync(async (req: Request, res: Response) => {
   const user = await authService.register(req.body);

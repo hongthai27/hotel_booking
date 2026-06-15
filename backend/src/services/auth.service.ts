@@ -76,13 +76,7 @@ export const login = async (data: LoginDto) => {
 
   return {
     token,
-    user: {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-    },
+    user: excludePassword(user),
   };
 };
 
