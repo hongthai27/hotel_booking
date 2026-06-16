@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -68,7 +68,7 @@ const RoomTypeFormModal = ({
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<RoomTypeFormValues>({
     resolver: zodResolver(roomTypeSchema),
     defaultValues: defaultValues
@@ -120,9 +120,32 @@ const RoomTypeFormModal = ({
     setDeleteImageIds((prev) => [...prev, imageId]);
   };
 
+  const handleClose = () => {
+    if (isDirty || imageFiles.length > 0 || deleteImageIds.length > 0) {
+      if (window.confirm('Dữ liệu chưa được lưu. Bạn có chắc chắn muốn hủy?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    const newFiles = [...imageFiles, ...files].slice(0, 10);
+    
+    const validFiles = files.filter(f => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+        toast.error(`File ${f.name} không đúng định dạng ảnh (jpg, png, webp)`);
+        return false;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`File ${f.name} vượt quá dung lượng 5MB`);
+        return false;
+      }
+      return true;
+    });
+
+    const newFiles = [...imageFiles, ...validFiles].slice(0, 10);
     setImageFiles(newFiles);
     setPreviewUrls(newFiles.map((f) => URL.createObjectURL(f)));
   };
@@ -172,7 +195,7 @@ const RoomTypeFormModal = ({
             {defaultValues ? 'Chỉnh sửa hạng phòng' : 'Thêm hạng phòng'}
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-sm"
             disabled={isPending}
           >
@@ -351,7 +374,7 @@ const RoomTypeFormModal = ({
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isPending}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
           >
@@ -481,6 +504,9 @@ const RoomTypeListPage = () => {
   const [editRoomTarget, setEditRoomTarget] = useState<any>(null);
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(null);
   
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortPriceOrder, setSortPriceOrder] = useState<'asc' | 'desc' | null>(null);
+
   const queryClient = useQueryClient();
 
   const { data: roomTypes, isLoading } = useAdminRoomTypes();
@@ -517,6 +543,21 @@ const RoomTypeListPage = () => {
     setExpandedRoomTypeId(prev => (prev === id ? null : id));
   };
 
+  const displayedRoomTypes = useMemo(() => {
+    if (!roomTypes) return [];
+    let result = [...roomTypes];
+    if (searchTerm) {
+      result = result.filter((rt: any) => rt.typeName.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    if (sortPriceOrder) {
+      result.sort((a: any, b: any) => {
+        if (sortPriceOrder === 'asc') return a.basePrice - b.basePrice;
+        return b.basePrice - a.basePrice;
+      });
+    }
+    return result;
+  }, [roomTypes, searchTerm, sortPriceOrder]);
+
   return (
     <div className="flex flex-col gap-6 relative">
       <div className="flex items-center justify-between">
@@ -529,6 +570,22 @@ const RoomTypeListPage = () => {
           className="bg-primary hover:bg-primary-dark text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
         >
           Thêm hạng phòng
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <input 
+          type="text" 
+          placeholder="Tìm kiếm hạng phòng..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none flex-1"
+        />
+        <button 
+          onClick={() => setSortPriceOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+          className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+        >
+          Giá tiền {sortPriceOrder === 'asc' ? '↑' : sortPriceOrder === 'desc' ? '↓' : ''}
         </button>
       </div>
 
@@ -547,9 +604,9 @@ const RoomTypeListPage = () => {
         </div>
       )}
 
-      {!isLoading && roomTypes && roomTypes.length > 0 && (
+      {!isLoading && displayedRoomTypes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {roomTypes.map((rt: any) => {
+          {displayedRoomTypes.map((rt: any) => {
             const image = rt.images?.[0]?.imageUrl;
             const visibleAmenities = rt.amenities?.slice(0, 3) ?? [];
             const extraAmenities = (rt.amenities?.length ?? 0) - 3;
@@ -609,6 +666,22 @@ const RoomTypeListPage = () => {
                       {rt._count?.rooms ?? rt.rooms?.length ?? 0} phòng
                     </span>
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const duplicatedTarget = {
+                            ...rt,
+                            id: undefined,
+                            version: undefined,
+                            typeName: `${rt.typeName} - Copy`,
+                          };
+                          setEditTarget(duplicatedTarget);
+                          setShowModal(true);
+                        }}
+                        className="text-green-600 text-sm font-medium hover:underline"
+                      >
+                        Nhân bản
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -684,7 +757,12 @@ const RoomTypeListPage = () => {
                                   <select
                                     value={room.status}
                                     disabled={isUpdatingStatus}
-                                    onChange={(e) => updateStatus({ id: room.id, status: e.target.value, version: room.version })}
+                                    onChange={(e) => {
+                                      const newStatus = e.target.value;
+                                      if (window.confirm('Bạn có chắc chắn muốn thay đổi trạng thái phòng này?')) {
+                                        updateStatus({ id: room.id, status: newStatus, version: room.version });
+                                      }
+                                    }}
                                     className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 cursor-pointer"
                                   >
                                     <option value="available">Trống</option>

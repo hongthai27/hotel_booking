@@ -185,6 +185,15 @@ export const createAmenity = catchAsync(async (req: Request, res: Response) => {
   successResponse(res, amenity, 'Tạo tiện ích thành công', 201);
 });
 
+export const updateAmenity = catchAsync(async (req: Request, res: Response) => {
+  const amenity = await hotelService.updateAmenity(
+    Number(req.params.id),
+    req.body,
+    req.user!.userId
+  );
+  successResponse(res, amenity, 'Cập nhật tiện ích thành công');
+});
+
 export const deleteAmenity = catchAsync(async (req: Request, res: Response) => {
   await hotelService.deleteAmenity(Number(req.params.id), req.user!.userId);
   successResponse(res, null, 'Xóa tiện ích thành công');

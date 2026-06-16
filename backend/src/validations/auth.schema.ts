@@ -2,14 +2,17 @@ import { z } from 'zod';
 
 const fullNameSchema = z
   .string({ required_error: 'Họ tên là bắt buộc' })
+  .trim()
   .min(2, 'Họ tên phải có ít nhất 2 ký tự');
 
 const emailSchema = z
   .string({ required_error: 'Email là bắt buộc' })
+  .trim()
   .email('Email không đúng định dạng');
 
 const phoneNumberSchema = z
   .string({ required_error: 'Số điện thoại là bắt buộc' })
+  .trim()
   .regex(/^\d{10,11}$/, 'Số điện thoại phải có 10 đến 11 chữ số');
 
 const passwordSchema = z
@@ -30,6 +33,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   identifier: z
     .string({ required_error: 'Email hoặc số điện thoại là bắt buộc' })
+    .trim()
     .min(1, 'Vui lòng không để trống email hoặc số điện thoại'),
   password: passwordSchema,
 });

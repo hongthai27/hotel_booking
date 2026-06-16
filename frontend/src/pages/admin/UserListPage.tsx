@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { adminService } from '../../services/adminService';
+import { useAuthStore } from '../../stores/authStore';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
@@ -37,6 +38,7 @@ const SkeletonRow = () => (
 
 const UserListPage = () => {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
@@ -178,12 +180,12 @@ const UserListPage = () => {
                       className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option value="" disabled>Chọn hành động</option>
-                      <option value="admin">Đặt làm Admin</option>
-                      <option value="receptionist">Đặt làm Lễ tân</option>
-                      <option value="customer">Đặt làm Khách hàng</option>
+                      <option value="admin" disabled={user.id === currentUser?.id}>Đặt làm Admin</option>
+                      <option value="receptionist" disabled={user.id === currentUser?.id}>Đặt làm Lễ tân</option>
+                      <option value="customer" disabled={user.id === currentUser?.id}>Đặt làm Khách hàng</option>
                       <option value="" disabled>──────────</option>
-                      <option value="inactive">Khóa tài khoản</option>
-                      <option value="active">Mở khóa tài khoản</option>
+                      <option value="inactive" disabled={user.id === currentUser?.id || user.status === 'inactive'}>Khóa tài khoản</option>
+                      <option value="active" disabled={user.id === currentUser?.id || user.status === 'active'}>Mở khóa tài khoản</option>
                     </select>
                   </td>
                 </tr>

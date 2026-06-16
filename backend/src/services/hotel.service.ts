@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma.util';
 import { AppError } from '../utils/app-error.util';
 import { createAuditLog } from '../utils/audit-log.util';
 import { uploadImage, deleteCloudinaryImage } from '../utils/cloudinary.util';
-import { RoomTypeDto, RoomDto, AmenityDto, SearchAvailableDto } from '../validations/hotel.schema';
+import { RoomTypeDto, RoomDto, AmenityDto, UpdateAmenityDto, SearchAvailableDto } from '../validations/hotel.schema';
 
 interface RoomFilter {
   status?: RoomStatus;
@@ -82,37 +82,44 @@ export const createRoomType = async (data: RoomTypeDto, files: Express.Multer.Fi
     imageUrls = results.filter((url): url is string => Boolean(url));
   }
 
-  return prisma.$transaction(async (tx) => {
-    const newRoomType = await tx.roomType.create({
-      data: {
-        typeName: data.typeName,
-        description: data.description,
-        maxCapacity: data.maxCapacity,
-        basePrice: data.basePrice,
-        amenities: {
-          create: data.amenityIds.map((amenityId) => ({ amenityId })),
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const newRoomType = await tx.roomType.create({
+        data: {
+          typeName: data.typeName,
+          description: data.description,
+          maxCapacity: data.maxCapacity,
+          basePrice: data.basePrice,
+          amenities: {
+            create: data.amenityIds.map((amenityId) => ({ amenityId })),
+          },
+          images: {
+            create: imageUrls.map((url, index) => ({
+              imageUrl: url,
+              displayOrder: index,
+            })),
+          },
         },
-        images: {
-          create: imageUrls.map((url, index) => ({
-            imageUrl: url,
-            displayOrder: index,
-          })),
-        },
-      },
-    });
+      });
 
-    await createAuditLog({
-      tx,
-      actorId,
-      targetTable: 'RoomType',
-      targetId: newRoomType.id,
-      action: 'CREATE',
-      oldValue: null,
-      newValue: newRoomType,
-    });
+      await createAuditLog({
+        tx,
+        actorId,
+        targetTable: 'RoomType',
+        targetId: newRoomType.id,
+        action: 'CREATE',
+        oldValue: null,
+        newValue: newRoomType,
+      });
 
-    return newRoomType;
-  });
+      return newRoomType;
+    });
+  } catch (error) {
+    if (imageUrls.length > 0) {
+      Promise.allSettled(imageUrls.map((url) => deleteCloudinaryImage(url))).catch(console.error);
+    }
+    throw error;
+  }
 };
 
 export const updateRoomType = async (
@@ -161,16 +168,9 @@ export const updateRoomType = async (
     newImageUrls = results.filter((url): url is string => Boolean(url));
   }
 
-  return prisma.$transaction(async (tx) => {
-    if (data.deleteImageIds && data.deleteImageIds.length > 0) {
-      const imagesToDelete = old.images.filter((img) =>
-        data.deleteImageIds!.includes(img.id)
-      );
-
-      await Promise.allSettled(
-        imagesToDelete.map((img) => deleteCloudinaryImage(img.imageUrl))
-      );
-
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      if (data.deleteImageIds && data.deleteImageIds.length > 0) {
       await tx.roomImage.deleteMany({
         where: {
           id: { in: data.deleteImageIds },
@@ -275,6 +275,23 @@ export const updateRoomType = async (
       },
     });
   });
+
+    if (data.deleteImageIds && data.deleteImageIds.length > 0) {
+      const imagesToDelete = old.images.filter((img) =>
+        data.deleteImageIds!.includes(img.id)
+      );
+      Promise.allSettled(
+        imagesToDelete.map((img) => deleteCloudinaryImage(img.imageUrl))
+      ).catch(console.error);
+    }
+
+    return result;
+  } catch (error) {
+    if (newImageUrls.length > 0) {
+      Promise.allSettled(newImageUrls.map((url) => deleteCloudinaryImage(url))).catch(console.error);
+    }
+    throw error;
+  }
 };
 
 export const deleteRoomType = async (id: number, actorId: number) => {
@@ -294,11 +311,7 @@ export const deleteRoomType = async (id: number, actorId: number) => {
     throw new AppError(400, 'Không thể xóa loại phòng đang có phòng sử dụng');
   }
 
-  if (existing.images.length > 0) {
-      await Promise.allSettled(existing.images.map((img) => deleteCloudinaryImage(img.imageUrl)));
-  }
-
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await tx.roomImage.deleteMany({ where: { roomTypeId: id } });
     await tx.roomTypeAmenity.deleteMany({ where: { roomTypeId: id } });
 
@@ -314,6 +327,10 @@ export const deleteRoomType = async (id: number, actorId: number) => {
       newValue: null,
     });
   });
+
+  if (existing.images.length > 0) {
+      Promise.allSettled(existing.images.map((img) => deleteCloudinaryImage(img.imageUrl))).catch(console.error);
+  }
 };
 
 export const searchAvailable = async (data: SearchAvailableDto) => {
@@ -413,6 +430,14 @@ export const createRoom = async (data: RoomDto, actorId: number) => {
 
     if (!roomType) {
       throw new AppError(404, 'Không tìm thấy loại phòng');
+    }
+
+    const existingRoom = await tx.room.findFirst({
+      where: { roomNumber: data.roomNumber }
+    });
+
+    if (existingRoom) {
+      throw new AppError(409, 'Số phòng này đã tồn tại trong hệ thống');
     }
 
     const room = await tx.room.create({
@@ -578,6 +603,14 @@ export const getAmenities = async () => {
 
 export const createAmenity = async (data: AmenityDto, actorId: number) => {
   return prisma.$transaction(async (tx) => {
+    const existingAmenity = await tx.amenity.findFirst({
+      where: { amenityName: data.amenityName }
+    });
+
+    if (existingAmenity) {
+      throw new AppError(409, 'Tên tiện ích đã tồn tại');
+    }
+
     const amenity = await tx.amenity.create({
       data: {
         amenityName: data.amenityName,
@@ -596,6 +629,45 @@ export const createAmenity = async (data: AmenityDto, actorId: number) => {
     });
 
     return amenity;
+  });
+};
+
+export const updateAmenity = async (id: number, data: UpdateAmenityDto, actorId: number) => {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.amenity.findUnique({ where: { id } });
+
+    if (!existing) {
+      throw new AppError(404, 'Không tìm thấy tiện ích');
+    }
+
+    if (data.amenityName && data.amenityName !== existing.amenityName) {
+      const nameExists = await tx.amenity.findFirst({
+        where: { amenityName: data.amenityName }
+      });
+      if (nameExists) {
+        throw new AppError(409, 'Tên tiện ích đã tồn tại');
+      }
+    }
+
+    const updated = await tx.amenity.update({
+      where: { id },
+      data: {
+        ...(data.amenityName && { amenityName: data.amenityName }),
+        ...(data.description !== undefined && { description: data.description }),
+      },
+    });
+
+    await createAuditLog({
+      tx,
+      actorId,
+      targetTable: 'Amenity',
+      targetId: id,
+      action: 'UPDATE',
+      oldValue: existing,
+      newValue: updated,
+    });
+
+    return updated;
   });
 };
 

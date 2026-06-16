@@ -56,6 +56,11 @@ export const amenitySchema = z.object({
   description: z.string().optional(),
 });
 
+export const updateAmenitySchema = z.object({
+  amenityName: z.string().min(1, 'Tên tiện ích không được để trống').optional(),
+  description: z.string().optional(),
+});
+
 // Thêm schema mới cho PATCH /admin/rooms/:id/status
 export const updateRoomStatusSchema = z.object({
   status: z.enum(['available', 'occupied', 'maintenance', 'cleaning', 'out_of_order'], {
@@ -92,5 +97,6 @@ export const searchAvailableSchema = z.object({
 export type RoomTypeDto = z.infer<typeof roomTypeSchema>;
 export type RoomDto = z.infer<typeof roomSchema>;
 export type AmenityDto = z.infer<typeof amenitySchema>;
+export type UpdateAmenityDto = z.infer<typeof updateAmenitySchema>;
 export type UpdateRoomStatusDto = z.infer<typeof updateRoomStatusSchema>;
 export type SearchAvailableDto = z.infer<typeof searchAvailableSchema>;
