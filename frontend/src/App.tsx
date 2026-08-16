@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'sonner';
 import { AppRouter } from './routes/app.routes';
 import { useAuthStore } from './stores/authStore';
@@ -32,21 +33,23 @@ const App = () => {
   }, [user]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppRouter />
-      <Toaster
-        position="top-right"
-        richColors
-        toastOptions={{
-          style: {
-            borderRadius: '12px',
-            fontSize: '13px',
-            fontFamily: 'var(--font-sans)',
-          },
-          duration: 3000,
-        }}
-      />
-    </QueryClientProvider>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <QueryClientProvider client={queryClient}>
+        <AppRouter />
+        <Toaster
+          position="top-right"
+          richColors
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontFamily: 'var(--font-sans)',
+            },
+            duration: 3000,
+          }}
+        />
+      </QueryClientProvider>
+    </GoogleOAuthProvider>
   );
 };
 

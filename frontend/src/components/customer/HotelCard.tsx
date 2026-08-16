@@ -1,5 +1,8 @@
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useCompareStore } from '../../stores/compareStore';
+import { useAuthStore } from '../../stores/authStore';
+import { useCartStore } from '../../stores/cartStore';
 import type { RoomType } from '../../types/hotel.types';
 
 interface Props {
@@ -16,6 +19,8 @@ const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
 const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
   const navigate = useNavigate();
   const { add, remove, isSelected } = useCompareStore();
+  const { user } = useAuthStore();
+  const { addToCart, setBookingDetails } = useCartStore();
   const selected = isSelected(roomType.id);
 
   const image = roomType.images?.[0]?.imageUrl;
@@ -29,6 +34,33 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
     const query = params.toString();
     // Đã sửa lại đường dẫn chuẩn khớp với app.routes.tsx
     navigate(`/room-type/${roomType.id}${query ? `?${query}` : ''}`);
+  };
+
+  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+
+    if (!checkIn || !checkOut) {
+      toast.error('Vui lòng chọn ngày nhận và trả phòng trước khi thêm vào giỏ.');
+      return;
+    }
+
+    if (!user) {
+      const params = new URLSearchParams();
+      params.set('checkIn', checkIn);
+      params.set('checkOut', checkOut);
+      if (guests) params.set('guests', String(guests));
+      const redirect = encodeURIComponent(`/room-type/${roomType.id}?${params.toString()}`);
+      navigate(`/login?redirect=${redirect}`);
+      return;
+    }
+
+    setBookingDetails({
+      checkIn: new Date(checkIn),
+      checkOut: new Date(checkOut),
+      guests: guests || 1,
+    });
+    addToCart(roomType, 1);
+    toast.success(`${roomType.typeName} đã được thêm vào giỏ hàng!`);
   };
 
   return (
@@ -101,7 +133,7 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
           <div>
             <span className="text-xs text-gray-400">Từ </span>
             <p className="text-primary font-medium text-lg leading-tight">
@@ -109,15 +141,24 @@ const HotelCard = ({ roomType, checkIn, checkOut, guests }: Props) => {
             </p>
             <span className="text-xs text-gray-400">/ đêm</span>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClick();
-            }}
-            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-xl border-none cursor-pointer transition-colors"
-          >
-            Xem chi tiết
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddToCart}
+              disabled={roomType.availableRoomCount === 0}
+              className="px-4 py-2 bg-white text-primary border border-primary text-sm font-medium rounded-xl cursor-pointer transition-colors hover:bg-blue-50 disabled:text-gray-300 disabled:border-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
+            >
+              Thêm vào giỏ
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-xl border-none cursor-pointer transition-colors"
+            >
+              Xem chi tiết
+            </button>
+          </div>
         </div>
       </div>
     </div>

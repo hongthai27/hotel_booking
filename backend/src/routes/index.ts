@@ -1,25 +1,18 @@
-import { Router, Request, Response } from 'express';
-import authRouter from './auth.route';
-import hotelRouter from './hotel.route';
-import bookingRouter from './booking.route';
-import paymentRouter from './payment.route';
-import promotionRouter from './promotion.route';
-import adminRouter from './admin.routes';
-import { startCronJobs } from '../services/cron.service';
+import { Router } from 'express';
+import authRoutes from './auth.route';
+import hotelRoutes from './hotel.route';
+import bookingRoutes from './booking.route';
+import paymentRoutes from './payment.route';
+import promotionRoutes from './promotion.route';
+import adminRoutes from './admin.routes';
 
-export const router = Router();
+const router = Router();
 
-startCronJobs();
+router.use('/auth', authRoutes);
+router.use('/hotels', hotelRoutes);
+router.use('/bookings', bookingRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/promotions', promotionRoutes);
+router.use('/admin', adminRoutes);
 
-router.get('/health', (_req: Request, res: Response): void => {
-  res.status(200).json({ success: true, message: 'Server is running' });
-});
-
-router.use('/auth', authRouter);
-router.use('/', hotelRouter);
-router.use('/', bookingRouter);
-router.use('/', paymentRouter);
-router.use('/promotions', promotionRouter);
-router.use('/admin', adminRouter);
-
-// TODO: router.use('/users', userRouter);
+export { router };

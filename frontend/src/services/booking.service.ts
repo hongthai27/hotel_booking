@@ -1,12 +1,18 @@
 import api from './api';
 import type { Booking, BookingStatus, Review, RefundPreview } from '../types/booking.types';
 
+interface BookingItem {
+  roomTypeId: number;
+  quantity: number;
+}
+
 interface CreateBookingData {
-  roomId: number;
+  items: BookingItem[];
   checkInDate: string;
   checkOutDate: string;
   guestCount: number;
   specialRequests?: string;
+  promoCode?: string;
 }
 
 interface CancelResponse {

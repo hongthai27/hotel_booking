@@ -68,3 +68,11 @@ export const changePasswordSchema = z.object({
 
 export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
+
+export const googleLoginSchema = z.object({
+  credential: z
+    .string({ required_error: 'Thiếu credential từ Google' })
+    .min(1, 'Thiếu credential từ Google'),
+});
+
+export type GoogleLoginDto = z.infer<typeof googleLoginSchema>;

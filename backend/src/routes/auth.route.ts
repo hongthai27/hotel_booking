@@ -6,6 +6,7 @@ import { authenticateJWT, authorizeRole } from '../middlewares/auth.middleware';
 import { 
   registerSchema, 
   loginSchema,
+  googleLoginSchema,      // MỚI
   forgotPasswordSchema, 
   resetPasswordSchema,
   updateProfileSchema,
@@ -33,6 +34,7 @@ const uploadAvatar = multer({
 
 router.post('/register', validateBody(registerSchema), authController.register);
 router.post('/login', validateBody(loginSchema), authController.login);
+router.post('/google', validateBody(googleLoginSchema), authController.googleLogin); // MỚI
 router.get('/me', authenticateJWT, authController.getMe);
 
 router.get(

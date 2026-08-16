@@ -25,6 +25,8 @@ enum RoomStatus {
   occupied
   maintenance
   cleaning
+  out_of_order
+  outoforder
 }
 
 enum BookingSource {
@@ -74,15 +76,17 @@ model User {
   fullName         String     @map("full_name") @db.VarChar(100)
   avatarUrl        String?    @map("avatar_url") @db.VarChar(255)
   email            String     @unique @map("email") @db.VarChar(150)
-  phoneNumber      String     @unique @map("phone_number") @db.VarChar(20)
+  phoneNumber      String?    @unique @map("phone_number") @db.VarChar(20)  // đổi String -> String?
   passwordHash     String     @map("password_hash") @db.VarChar(255)
+  googleId         String?    @unique @map("google_id") @db.VarChar(255)   // MỚI
   resetToken       String?    @map("reset_token") @db.VarChar(255)
   resetTokenExpiry DateTime?  @map("reset_token_expiry")
+  idNumber         String?    @map("id_number") @db.VarChar(20)
   role             UserRole   @default(customer) @map("role")
   status           UserStatus @default(active) @map("status")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
-  
+
   // relations
   bookings        Booking[]  @relation("BookingCustomer")
   createdBookings Booking[]  @relation("BookingCreatedBy")
@@ -103,9 +107,11 @@ model RoomType {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // relations
-  rooms     Room[]
-  images    RoomImage[]
-  amenities RoomTypeAmenity[]
+  rooms        Room[]
+  images       RoomImage[]
+  amenities    RoomTypeAmenity[]
+  bookingLines BookingRoomType[]
+  paymentAllocations PaymentAllocation[]
 
   @@map("ROOM_TYPE")
 }
@@ -116,14 +122,13 @@ model Room {
   roomNumber   String     @unique @map("room_number") @db.VarChar(20)
   floor        Int?       @map("floor")
   status       RoomStatus @default(available) @map("status")
-  currentPrice Decimal    @map("current_price") @db.Decimal(12, 2)
   version      Int        @default(0) @map("version")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   // relations
-  roomType RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  bookings Booking[]
+  roomType     RoomType      @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookingRooms BookingRoom[]
 
   @@index([roomTypeId])
   @@index([status])
@@ -169,59 +174,90 @@ model RoomImage {
 }
 
 model Booking {
-  id           Int           @id @default(autoincrement()) @map("booking_id")
-  userId       Int           @map("user_id")
-  roomId       Int           @map("room_id")
-  createdBy    Int?          @map("created_by")
-  checkInDate  DateTime      @map("check_in_date") @db.Date
-  checkOutDate DateTime      @map("check_out_date") @db.Date
-  guestCount   Int           @map("guest_count")
-  totalAmount  Decimal       @map("total_amount") @db.Decimal(12, 2)
-  source       BookingSource @default(online) @map("source")
-  status       BookingStatus @default(pending_payment) @map("status")
-  paidAt       DateTime?     @map("paid_at")
-  cancelledAt  DateTime?     @map("cancelled_at")
-  cancelReason String?       @map("cancel_reason") @db.VarChar(255)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  idNumber     String?  @map("id_number")     @db.VarChar(20)
-  checkinNote  String?  @map("checkin_note")   @db.VarChar(500)
-  extraCharges Json?    @map("extra_charges")
-  extraTotal   Decimal  @default(0) @map("extra_total") @db.Decimal(12, 2)
-  specialRequests String? @map("special_requests") @db.VarChar(500)
-  promoCode    String?  @map("promo_code") @db.VarChar(50)
-  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  promotionId  Int?     @map("promotion_id")
-  
+  id             Int           @id @default(autoincrement()) @map("booking_id")
+  userId         Int           @map("user_id")
+  createdBy      Int?          @map("created_by")
+  checkInDate    DateTime      @map("check_in_date") @db.Date
+  checkOutDate   DateTime      @map("check_out_date") @db.Date
+  guestCount     Int           @map("guest_count")
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(12, 2)
+  source         BookingSource @default(online) @map("source")
+  status         BookingStatus @default(pending_payment) @map("status")
+  paidAt         DateTime?     @map("paid_at")
+  cancelledAt    DateTime?     @map("cancelled_at")
+  cancelReason   String?       @map("cancel_reason") @db.VarChar(255)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  specialRequests String?      @map("special_requests") @db.VarChar(500)
+  promoCode      String?       @map("promo_code") @db.VarChar(50)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  promotionId    Int?          @map("promotion_id")
+
   // relations
-  customer       User     @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
-  createdByStaff User?    @relation("BookingCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  room           Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  promotion      Promotion? @relation(fields: [promotionId], references: [id])
+  customer       User              @relation("BookingCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  createdByStaff User?             @relation("BookingCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  promotion      Promotion?        @relation(fields: [promotionId], references: [id])
   payments       Payment[]
   review         Review?
+  roomTypeLines  BookingRoomType[]
+  assignedRooms  BookingRoom[]
 
   @@index([userId])
-  @@index([roomId])
   @@index([createdBy])
   @@index([checkInDate, checkOutDate])
   @@map("BOOKING")
 }
 
+model BookingRoomType {
+  id             Int     @id @default(autoincrement())
+  bookingId      Int     @map("booking_id")
+  roomTypeId     Int     @map("room_type_id")
+  quantity       Int
+  priceAtBooking Decimal @map("price_at_booking") @db.Decimal(12, 2)
+
+  // relations
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([roomTypeId])
+  @@map("BOOKING_ROOM_TYPE")
+}
+
+model BookingRoom {
+  id           Int       @id @default(autoincrement())
+  bookingId    Int       @map("booking_id")
+  roomId       Int       @map("room_id")
+  checkinAt    DateTime  @map("checkin_at")
+  checkoutAt   DateTime? @map("checkout_at")
+  idNumber     String?   @map("id_number") @db.VarChar(20)
+  checkinNote  String?   @map("checkin_note") @db.Text
+  extraCharges Json?     @map("extra_charges")
+
+  // relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([roomId])
+  @@map("BOOKING_ROOM")
+}
+
 model Payment {
-  id             Int           @id @default(autoincrement()) @map("payment_id")
-  bookingId      Int           @map("booking_id")
-  amount         Decimal       @map("amount") @db.Decimal(12, 2)
-  method         PaymentMethod @map("method")
-  status         PaymentStatus @default(pending) @map("status")
+  id             Int            @id @default(autoincrement()) @map("payment_id")
+  bookingId      Int            @map("booking_id")
+  amount         Decimal        @map("amount") @db.Decimal(12, 2)
+  method         PaymentMethod  @map("method")
+  status         PaymentStatus  @default(pending) @map("status")
   feeType        PaymentFeeType @default(booking) @map("fee_type")
-  transactionRef String?       @unique @map("transaction_ref") @db.VarChar(255)
-  paidAt         DateTime?     @map("paid_at")
-  refundedAt     DateTime?     @map("refunded_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
+  transactionRef String?        @unique @map("transaction_ref") @db.VarChar(255)
+  paidAt         DateTime?      @map("paid_at")
+  refundedAt     DateTime?      @map("refunded_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
 
   // relations
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  allocations PaymentAllocation[]
 
   @@index([bookingId])
   @@map("PAYMENT")
@@ -262,20 +298,36 @@ model AuditLog {
 }
 
 model Promotion {
-  id          Int       @id @default(autoincrement()) @map("promotion_id")
-  code        String    @unique @map("code") @db.VarChar(50)
-  type        String    @map("type") @db.VarChar(20)
-  value       Float     @map("value")
-  minNights   Int?      @map("min_nights")
-  usageLimit  Int?      @map("usage_limit")
-  usedCount   Int       @default(0) @map("used_count")
-  startDate   DateTime  @map("start_date")
-  endDate     DateTime  @map("end_date")
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id         Int       @id @default(autoincrement()) @map("promotion_id")
+  code       String    @unique @map("code") @db.VarChar(50)
+  type       String    @map("type") @db.VarChar(20)
+  value      Float     @map("value")
+  minNights  Int?      @map("min_nights")
+  usageLimit Int?      @map("usage_limit")
+  usedCount  Int       @default(0) @map("used_count")
+  startDate  DateTime  @map("start_date")
+  endDate    DateTime  @map("end_date")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  bookings    Booking[]
+  bookings Booking[]
 
   @@map("PROMOTION")
-}
+  }
+
+  model PaymentAllocation {
+  id           Int      @id @default(autoincrement())
+  paymentId    Int      @map("payment_id")
+  roomTypeId   Int      @map("room_type_id")
+  roomTypeName String   @map("room_type_name") @db.VarChar(100)
+  amount       Decimal  @db.Decimal(12, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  roomType  RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([roomTypeId])
+  @@map("PAYMENT_ALLOCATION")
+  }

@@ -6,7 +6,7 @@ export interface User {
   id: number;
   fullName: string;
   email: string;
-  phoneNumber: string;
+  phoneNumber: string | null;  // đổi: user Google có thể chưa có SĐT
   avatarUrl?: string | null;
   role: UserRole;
   status: UserStatus;

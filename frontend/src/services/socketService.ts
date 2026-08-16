@@ -35,6 +35,7 @@ class SocketService {
 
   connect(role: string): void {
     this.currentRole = role;
+    this.socket.auth = { token: localStorage.getItem('hotel_token') }; // đọc lại token mới nhất
     if (!this.socket.connected) {
       this.socket.connect();
     } else {

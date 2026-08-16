@@ -104,8 +104,10 @@ export const simulateSuccess = async (transactionRef: string) => {
     where: { id: payment.bookingId },
     include: {
       customer: true,
-      room: {
-        include: { roomType: true },
+      roomTypeLines: {
+        include: {
+          roomType: true,
+        },
       },
     },
   });
@@ -140,6 +142,58 @@ export const simulateSuccess = async (transactionRef: string) => {
       data: { status: 'confirmed', paidAt: new Date() },
     });
 
+    // Step 3.2: Create Payment Allocations
+    if (booking.roomTypeLines.length > 0) {
+      const lines = booking.roomTypeLines;
+      const paymentAmount = Number(payment.amount);
+      let totalOriginalValue = 0;
+      for (const line of lines) {
+        totalOriginalValue += Number(line.priceAtBooking) * line.quantity;
+      }
+
+      const allocations: {
+        paymentId: number;
+        roomTypeId: number;
+        roomTypeName: string;
+        amount: number;
+      }[] = [];
+
+      if (totalOriginalValue === 0) {
+        const splitAmount = paymentAmount / lines.length;
+        for (const line of lines) {
+          allocations.push({
+            paymentId: payment.id,
+            roomTypeId: line.roomTypeId,
+            roomTypeName: line.roomType.typeName,
+            amount: splitAmount,
+          });
+        }
+      } else {
+        let allocatedTotal = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          let allocatedAmount = 0;
+          if (i === lines.length - 1) {
+            allocatedAmount = paymentAmount - allocatedTotal;
+          } else {
+            const lineValue = Number(line.priceAtBooking) * line.quantity;
+            const ratio = lineValue / totalOriginalValue;
+            allocatedAmount = paymentAmount * ratio;
+            allocatedTotal += allocatedAmount;
+          }
+          allocations.push({
+            paymentId: payment.id,
+            roomTypeId: line.roomTypeId,
+            roomTypeName: line.roomType.typeName,
+            amount: allocatedAmount,
+          });
+        }
+      }
+      await tx.paymentAllocation.createMany({
+        data: allocations,
+      });
+    }
+
     await createAuditLog({
       tx,
       actorId: booking.userId, 
@@ -163,10 +217,10 @@ export const simulateSuccess = async (transactionRef: string) => {
   emitPaymentConfirmed(payment.bookingId);
   emitBookingUpdate(payment.bookingId, { status: 'confirmed' });
 
-  if (booking?.customer) {
+  if (booking?.customer && booking.roomTypeLines.length > 0) {
     emitNewBooking({
       bookingId: booking.id,
-      roomTypeName: booking.room.roomType.typeName,
+      roomTypeName: booking.roomTypeLines[0].roomType.typeName,
       guestName: booking.customer.fullName,
       checkInDate: booking.checkInDate,
     });
@@ -174,9 +228,9 @@ export const simulateSuccess = async (transactionRef: string) => {
     void sendBookingConfirmationEmail(
       {
         ...booking,
-        roomName: booking.room.roomType.typeName,
-        roomTypeName: booking.room.roomType.typeName,
-        roomNumber: booking.room.roomNumber,
+        roomName: booking.roomTypeLines[0].roomType.typeName,
+        roomTypeName: booking.roomTypeLines[0].roomType.typeName,
+        roomNumber: 'N/A',
         totalAmount: Number(booking.totalAmount),
       } as never,
       booking.customer
@@ -192,6 +246,18 @@ export const simulateSuccess = async (transactionRef: string) => {
 export const confirmRefund = async (paymentId: number, actorId: number) => {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
+    include: {
+      // We need the original payment that was successful to find allocations
+      booking: {
+        include: {
+          payments: {
+            where: { status: 'success', feeType: 'booking' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      },
+    },
   });
 
   if (!payment || payment.status !== 'pending_refund') {
@@ -199,6 +265,7 @@ export const confirmRefund = async (paymentId: number, actorId: number) => {
   }
 
   return prisma.$transaction(async (tx) => {
+    // 1. Update payment status to 'refunded'
     const updateResult = await tx.payment.updateMany({
       where: { id: paymentId, status: 'pending_refund' },
       data: { status: 'refunded', refundedAt: new Date() },
@@ -210,6 +277,32 @@ export const confirmRefund = async (paymentId: number, actorId: number) => {
 
     const updated = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
 
+    // 2. Create reversal (negative) allocations
+    // Find the original successful payment for this booking
+    const originalPayment = payment.booking.payments[0];
+
+    if (originalPayment) {
+      // Find the allocations of the original payment
+      const originalAllocations = await tx.paymentAllocation.findMany({
+        where: { paymentId: originalPayment.id },
+      });
+
+      if (originalAllocations.length > 0) {
+        const reversalAllocations = originalAllocations.map(alloc => ({
+          paymentId: updated.id, // Link to the current *refund* payment record
+          roomTypeId: alloc.roomTypeId,
+          roomTypeName: alloc.roomTypeName,
+          amount: -Number(alloc.amount), // Negate the amount
+        }));
+
+        await tx.paymentAllocation.createMany({
+          data: reversalAllocations,
+        });
+      }
+    }
+
+
+    // 3. Create audit log
     await createAuditLog({
       tx,
       actorId,

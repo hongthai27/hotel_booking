@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Room } from '@prisma/client'
 import bcrypt from 'bcrypt'
+import { createBooking, checkIn, checkOut } from '../src/services/booking.service'
 
 const prisma = new PrismaClient()
 const hash = (pw: string) => bcrypt.hash(pw, 10)
@@ -63,11 +64,13 @@ const IMGS = {
 
 // ─── MAIN ────────────────────────────────────────
 async function main() {
-  console.log('Bat dau seed...\nXoa du lieu cu...')
+  console.log(`Bat dau seed...\nXoa du lieu cu...`)
 
   await prisma.auditLog.deleteMany()
   await prisma.review.deleteMany()
   await prisma.payment.deleteMany()
+  await prisma.bookingRoom.deleteMany()
+  await prisma.bookingRoomType.deleteMany()
   await prisma.booking.deleteMany()
   await prisma.room.deleteMany()
   await prisma.roomTypeAmenity.deleteMany()
@@ -238,8 +241,8 @@ async function main() {
   // ════════════════════════════════════════════
   console.log('Tao 29 phong...')
 
-  const mkRoom = (typeId: number, num: string, floor: number, price: number, status = 'available') =>
-    prisma.room.create({ data: { roomTypeId: typeId, roomNumber: num, floor, currentPrice: price, status: status as any, version: 0 }})
+  const mkRoom = (typeId: number, num: string, floor: number, status = 'available') =>
+    prisma.room.create({ data: { roomTypeId: typeId, roomNumber: num, floor, status: status as any, version: 0 }})
 
   const [
     // Tầng 1 — Standard (giá thấp nhất)
@@ -261,53 +264,53 @@ async function main() {
     // Tầng 9 — Mới
     r901, r902, r903, r904, r905,
   ] = await Promise.all([
-    // Tầng 1 — Standard (750k–850k)
-    mkRoom(rtStd.id, '101', 1, 750000),
-    mkRoom(rtStd.id, '102', 1, 750000),
-    mkRoom(rtStd.id, '103', 1, 780000, 'cleaning'),
-    mkRoom(rtStd.id, '104', 1, 800000),
+    // Tầng 1 — Standard
+    mkRoom(rtStd.id, '101', 1),
+    mkRoom(rtStd.id, '102', 1),
+    mkRoom(rtStd.id, '103', 1, 'cleaning'),
+    mkRoom(rtStd.id, '104', 1),
 
-    // Tầng 2 — Standard + Deluxe (850k–1.5M)
-    mkRoom(rtStd.id, '201', 2, 850000),
-    mkRoom(rtStd.id, '202', 2, 860000),
-    mkRoom(rtDlx.id, '203', 2, 1400000, 'occupied'),
-    mkRoom(rtDlx.id, '204', 2, 1450000),
+    // Tầng 2 — Standard + Deluxe
+    mkRoom(rtStd.id, '201', 2),
+    mkRoom(rtStd.id, '202', 2),
+    mkRoom(rtDlx.id, '203', 2, 'occupied'),
+    mkRoom(rtDlx.id, '204', 2),
 
-    // Tầng 3 — Deluxe (1.5M–1.8M)
-    mkRoom(rtDlx.id, '301', 3, 1500000),
-    mkRoom(rtDlx.id, '302', 3, 1550000),
-    mkRoom(rtDlx.id, '303', 3, 1600000),
-    mkRoom(rtDlx.id, '304', 3, 1800000, 'maintenance'),
+    // Tầng 3 — Deluxe
+    mkRoom(rtDlx.id, '301', 3),
+    mkRoom(rtDlx.id, '302', 3),
+    mkRoom(rtDlx.id, '303', 3),
+    mkRoom(rtDlx.id, '304', 3, 'maintenance'),
 
-    // Tầng 4 — Premium (2.2M–2.8M)
-    mkRoom(rtPrm.id, '401', 4, 2200000),
-    mkRoom(rtPrm.id, '402', 4, 2400000),
-    mkRoom(rtPrm.id, '403', 4, 2600000, 'occupied'),
-    mkRoom(rtPrm.id, '404', 4, 2800000),
+    // Tầng 4 — Premium
+    mkRoom(rtPrm.id, '401', 4),
+    mkRoom(rtPrm.id, '402', 4),
+    mkRoom(rtPrm.id, '403', 4, 'occupied'),
+    mkRoom(rtPrm.id, '404', 4),
 
-    // Tầng 5 — Premium view cao (3M–3.2M)
-    mkRoom(rtPrm.id, '501', 5, 3000000),
-    mkRoom(rtPrm.id, '502', 5, 3200000),
+    // Tầng 5 — Premium view cao
+    mkRoom(rtPrm.id, '501', 5),
+    mkRoom(rtPrm.id, '502', 5),
 
-    // Tầng 6 — Suite (4.5M–5M)
-    mkRoom(rtSte.id, '601', 6, 4500000),
-    mkRoom(rtSte.id, '602', 6, 5000000),
+    // Tầng 6 — Suite
+    mkRoom(rtSte.id, '601', 6),
+    mkRoom(rtSte.id, '602', 6),
 
-    // Tầng 7 — Suite Penthouse (6M)
-    mkRoom(rtSte.id, '701', 7, 6000000),
+    // Tầng 7 — Suite Penthouse
+    mkRoom(rtSte.id, '701', 7),
 
-    // Tầng 8 — Family (2.8M–3.5M)
-    mkRoom(rtFam.id, '801', 8, 2800000),
-    mkRoom(rtFam.id, '802', 8, 3000000),
-    mkRoom(rtFam.id, '803', 8, 3500000),
+    // Tầng 8 — Family
+    mkRoom(rtFam.id, '801', 8),
+    mkRoom(rtFam.id, '802', 8),
+    mkRoom(rtFam.id, '803', 8),
     
-    mkRoom(rtSgl.id, '901', 9, 500000),
-    mkRoom(rtTwn.id, '902', 9, 850000),
-    mkRoom(rtStu.id, '903', 9, 1200000),
-    mkRoom(rtExe.id, '904', 9, 3000000),
-    mkRoom(rtPrs.id, '905', 9, 10000000),
+    mkRoom(rtSgl.id, '901', 9),
+    mkRoom(rtTwn.id, '902', 9),
+    mkRoom(rtStu.id, '903', 9),
+    mkRoom(rtExe.id, '904', 9),
+    mkRoom(rtPrs.id, '905', 9),
   ])
-  console.log('Xong: 29 phong (500k -> 10M/dem, cac trang thai)')
+  console.log('Xong: 29 phong')
 
   // ════════════════════════════════════════════
   // 5. PROMOTIONS
@@ -327,9 +330,9 @@ async function main() {
   ])
 
   // ════════════════════════════════════════════
-  // 6. BOOKINGS + PAYMENTS — 6 tháng
+  // 6. BOOKINGS — qua đúng luồng thật (createBooking/checkIn/checkOut/cancelBooking)
   // ════════════════════════════════════════════
-  console.log('Tao 9 bookings hien tai + tuong lai...')
+  console.log('Tao bookings qua luong that...')
 
   const mkPay = (bookingId: number, amount: number, method: string,
     status: string, feeType: string, paidAt?: Date, refundedAt?: Date, ref?: string) =>
@@ -341,205 +344,222 @@ async function main() {
       transactionRef: ref ?? `TXN-${bookingId}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     }})
 
+  type SeedTarget = 'pending_payment' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
+
+  const seedBooking = async (opts: {
+    userId: number
+    items: { roomTypeId: number; quantity: number }[]
+    checkIn: Date
+    checkOut: Date
+    guestCount: number
+    target: SeedTarget
+    createdBy?: number
+    specialRequests?: string
+    promoCode?: string
+    method?: 'cash' | 'card' | 'qr_code'
+    cancelReason?: string
+    idNumber?: string
+    checkinNote?: string
+    extra?: { label: string; amount: number }[]
+  }) => {
+    const booking = await createBooking(
+      {
+        items: opts.items,
+        checkInDate: opts.checkIn.toISOString(),
+        checkOutDate: opts.checkOut.toISOString(),
+        guestCount: opts.guestCount,
+        specialRequests: opts.specialRequests,
+        promoCode: opts.promoCode,
+      } as any,
+      opts.userId
+    )
+
+    if (opts.createdBy) {
+      await prisma.booking.update({ where: { id: booking.id }, data: { createdBy: opts.createdBy, source: 'offline' } })
+    }
+
+    if (opts.target === 'pending_payment') return booking
+
+    await mkPay(booking.id, Number(booking.totalAmount), opts.method ?? 'qr_code', 'success', 'booking', opts.checkIn)
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'confirmed', paidAt: opts.checkIn } })
+
+    if (opts.target === 'confirmed') return booking
+
+    if (opts.target === 'cancelled') {
+      const daysUntil = Math.ceil((opts.checkIn.getTime() - Date.now()) / 86400000)
+      const refundAmount = daysUntil >= 3 ? Number(booking.totalAmount) : Number(booking.totalAmount) * 0.5
+      const penalty = Number(booking.totalAmount) - refundAmount
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: 'cancelled', cancelledAt: new Date(), cancelReason: opts.cancelReason ?? 'Khách hàng hủy' },
+      })
+      const successPay = await prisma.payment.findFirst({ where: { bookingId: booking.id, status: 'success', feeType: 'booking' } })
+      if (successPay) {
+        await prisma.payment.update({ where: { id: successPay.id }, data: { status: 'pending_refund' } })
+        if (refundAmount > 0) await mkPay(booking.id, refundAmount, 'qr_code', 'pending_refund', 'refund')
+        if (penalty > 0) await mkPay(booking.id, penalty, 'qr_code', 'success', 'penalty', new Date())
+      }
+      return booking
+    }
+
+    const lines = await prisma.bookingRoomType.findMany({ where: { bookingId: booking.id } })
+    const bookingRoomIds: number[] = []
+    for (const line of lines) {
+      for (let n = 0; n < line.quantity; n++) {
+        const br = await checkIn(booking.id, opts.createdBy ?? 1, {
+          bookingRoomTypeId: line.id,
+          idNumber: opts.idNumber,
+          checkinNote: opts.checkinNote,
+        })
+        bookingRoomIds.push(br.id)
+      }
+    }
+
+    if (opts.target === 'checked_in') return booking
+
+    for (const brId of bookingRoomIds) {
+      await checkOut(booking.id, opts.createdBy ?? 1, brId, opts.extra ?? [], opts.method ?? 'cash')
+      const br = await prisma.bookingRoom.findUnique({ where: { id: brId } })
+      if (br) await prisma.room.update({ where: { id: br.roomId }, data: { status: 'available' } }) // seed: mô phỏng "đã dọn xong"
+    }
+
+    return booking
+  }
+
   // ── HIỆN TẠI (demo trực tiếp) ──
-  // B01: Đang ở (checked_in) — demo Check-out. CÓ THÊM ID NUMBER & CHECKIN NOTE
-  const b01 = await prisma.booking.create({ data: {
-    userId: c0.id, roomId: r203.id,
-    checkInDate: d(-1), checkOutDate: d(2), guestCount: 2,
-    totalAmount: 4797000, source: 'online', status: 'checked_in', paidAt: d(-2),
+  console.log('Tao 10 bookings demo hien tai...')
+
+  const b01 = await seedBooking({
+    userId: c0.id, items: [{ roomTypeId: rtDlx.id, quantity: 1 }],
+    checkIn: d(-1), checkOut: d(2), guestCount: 2, target: 'checked_in',
     idNumber: '001099001234', checkinNote: 'Khách đến nhận phòng sớm 30 phút.',
-  }})
-  await mkPay(b01.id, 4797000, 'qr_code', 'success', 'booking', d(-2))
+  })
 
-  // B02: Confirmed — nhận phòng ngày mai (demo Check-in). CÓ YÊU CẦU ĐẶC BIỆT
-  const b02 = await prisma.booking.create({ data: {
-    userId: c1.id, roomId: r301.id,
-    checkInDate: d(1), checkOutDate: d(3), guestCount: 2,
-    totalAmount: 3398000, source: 'online', status: 'confirmed', paidAt: d(-1),
+  const b02 = await seedBooking({
+    userId: c1.id, items: [{ roomTypeId: rtDlx.id, quantity: 1 }],
+    checkIn: d(1), checkOut: d(3), guestCount: 2, target: 'confirmed',
     specialRequests: 'Tầng cao, view đẹp, Giường đôi (Double bed)',
-  }})
-  await mkPay(b02.id, 3398000, 'qr_code', 'success', 'booking', d(-1))
+  })
 
-  // B03: Pending payment — demo QR thanh toán. CÓ YÊU CẦU ĐẶC BIỆT
-  const b03 = await prisma.booking.create({ data: {
-    userId: c2.id, roomId: r401.id,
-    checkInDate: d(5), checkOutDate: d(7), guestCount: 2,
-    totalAmount: 11798000, source: 'online', status: 'pending_payment',
+  const b03 = await seedBooking({
+    userId: c2.id, items: [{ roomTypeId: rtPrm.id, quantity: 1 }],
+    checkIn: d(5), checkOut: d(7), guestCount: 2, target: 'pending_payment',
     specialRequests: 'Đến muộn sau 22h, Gần thang máy',
-  }})
-  await mkPay(b03.id, 11798000, 'qr_code', 'pending', 'booking')
+  })
 
-  // B04: Offline — lễ tân tạo, confirmed
-  const b04 = await prisma.booking.create({ data: {
-    userId: c3.id, roomId: r801.id,
-    createdBy: r1.id, checkInDate: d(3), checkOutDate: d(7),
-    guestCount: 4, totalAmount: 13196000, source: 'offline', status: 'confirmed', paidAt: new Date(),
-  }})
-  await mkPay(b04.id, 13196000, 'cash', 'success', 'booking', new Date())
+  const b04 = await seedBooking({
+    userId: c3.id, items: [{ roomTypeId: rtFam.id, quantity: 1 }],
+    checkIn: d(3), checkOut: d(7), guestCount: 4, target: 'confirmed',
+    createdBy: r1.id, method: 'cash',
+  })
 
-  // B05: Cancelled + pending_refund 50%
-  const b05 = await prisma.booking.create({ data: {
-    userId: c4.id, roomId: r302.id,
-    checkInDate: d(2), checkOutDate: d(4), guestCount: 2,
-    totalAmount: 3598000, source: 'online', status: 'cancelled',
-    paidAt: d(-5), cancelledAt: d(-1), cancelReason: 'Thay đổi kế hoạch',
-  }})
-  await mkPay(b05.id, 3598000, 'qr_code', 'refunded', 'booking', d(-5), d(-1))
-  await mkPay(b05.id, 1799000, 'qr_code', 'pending_refund', 'refund', undefined, undefined, `REFUND-B05-${Date.now()}`)
-  await mkPay(b05.id, 1799000, 'qr_code', 'success', 'penalty', d(-1), undefined, `PENALTY-B05-${Date.now()}`)
+  const b05 = await seedBooking({
+    userId: c4.id, items: [{ roomTypeId: rtDlx.id, quantity: 1 }],
+    checkIn: d(2), checkOut: d(4), guestCount: 2, target: 'cancelled',
+    cancelReason: 'Thay đổi kế hoạch',
+  })
 
-  // B06: Suite — confirmed xa
-  const b06 = await prisma.booking.create({ data: {
-    userId: c0.id, roomId: r601.id,
-    checkInDate: d(14), checkOutDate: d(17), guestCount: 2,
-    totalAmount: 14997000, source: 'online', status: 'confirmed', paidAt: d(-2),
-  }})
-  await mkPay(b06.id, 14997000, 'qr_code', 'success', 'booking', d(-2))
+  const b06 = await seedBooking({
+    userId: c0.id, items: [{ roomTypeId: rtSte.id, quantity: 1 }],
+    checkIn: d(14), checkOut: d(17), guestCount: 2, target: 'confirmed',
+  })
 
-  // B07: Premium + offline — lễ tân r2
-  const b07 = await prisma.booking.create({ data: {
-    userId: c5.id, roomId: r501.id,
-    createdBy: r2.id, checkInDate: d(10), checkOutDate: d(13),
-    guestCount: 2, totalAmount: 19497000, source: 'offline', status: 'confirmed', paidAt: new Date(),
-  }})
-  await mkPay(b07.id, 19497000, 'card', 'success', 'booking', new Date())
+  const b07 = await seedBooking({
+    userId: c5.id, items: [{ roomTypeId: rtPrm.id, quantity: 1 }],
+    checkIn: d(10), checkOut: d(13), guestCount: 2, target: 'confirmed',
+    createdBy: r2.id, method: 'card',
+  })
 
-  // B08: Cancelled + hoàn 100% đã xong
-  const b08 = await prisma.booking.create({ data: {
-    userId: c6.id, roomId: r201.id,
-    checkInDate: d(20), checkOutDate: d(22), guestCount: 2,
-    totalAmount: 1900000, source: 'online', status: 'cancelled',
-    paidAt: d(-10), cancelledAt: d(-7), cancelReason: 'Đổi địa điểm đi chơi',
-  }})
-  await mkPay(b08.id, 1900000, 'qr_code', 'refunded', 'booking', d(-10), d(-7))
-  await mkPay(b08.id, 1900000, 'qr_code', 'refunded', 'refund', undefined, d(-5), `REFUND-B08-${Date.now()}`)
+  const b08 = await seedBooking({
+    userId: c6.id, items: [{ roomTypeId: rtStd.id, quantity: 1 }],
+    checkIn: d(20), checkOut: d(22), guestCount: 2, target: 'cancelled',
+    cancelReason: 'Đổi địa điểm đi chơi',
+  })
 
-  // B09: Family Penthouse — xa trong tương lai
-  const b09 = await prisma.booking.create({ data: {
-    userId: c7.id, roomId: r803.id,
-    checkInDate: d(30), checkOutDate: d(35), guestCount: 5,
-    totalAmount: 19995000, source: 'online', status: 'confirmed', paidAt: d(-1),
-  }})
-  await mkPay(b09.id, 19995000, 'qr_code', 'success', 'booking', d(-1))
-  
-  let presentTotalRevenue = 4797000 + 3398000 + 13196000 + 1799000 + 14997000 + 19497000 + 19995000;
+  const b09 = await seedBooking({
+    userId: c7.id, items: [{ roomTypeId: rtFam.id, quantity: 1 }],
+    checkIn: d(30), checkOut: d(35), guestCount: 5, target: 'confirmed',
+  })
 
-  // ── QUÁ KHỨ (6 tháng) ──
-  console.log('Tao du lieu 90 bookings qua khu (6 thang)...')
-  
-  const allRooms = [
-    { r: r101, price: 899000 }, { r: r102, price: 899000 }, { r: r103, price: 950000 }, { r: r104, price: 950000 },
-    { r: r201, price: 950000 }, { r: r202, price: 999000 }, { r: r203, price: 1599000 }, { r: r204, price: 1650000 },
-    { r: r301, price: 1699000 }, { r: r302, price: 1799000 }, { r: r303, price: 1899000 }, { r: r304, price: 1999000 },
-    { r: r401, price: 5899000 }, { r: r402, price: 5999000 }, { r: r403, price: 6199000 }, { r: r404, price: 6299000 },
-    { r: r501, price: 6499000 }, { r: r502, price: 6699000 },
-    { r: r601, price: 4999000 }, { r: r602, price: 5499000 },
-    { r: r701, price: 6599000 },
-    { r: r801, price: 3299000 }, { r: r802, price: 3599000 }, { r: r803, price: 3999000 },
-    { r: r901, price: 599000 }, { r: r902, price: 999000 }, { r: r903, price: 1399000 }, { r: r904, price: 3499000 }, { r: r905, price: 12000000 },
+  // B10: MỚI — demo đúng tính năng giỏ hàng nhiều phòng
+  const b10 = await seedBooking({
+    userId: c8.id,
+    items: [{ roomTypeId: rtDlx.id, quantity: 2 }, { roomTypeId: rtStd.id, quantity: 1 }],
+    checkIn: d(8), checkOut: d(10), guestCount: 6, target: 'confirmed',
+    specialRequests: 'Đặt cho nhóm bạn 6 người, muốn phòng gần nhau',
+  })
+
+  console.log('Xong: 10 bookings demo hien tai (B01-B10)')
+
+  // ── QUÁ KHỨ (6 tháng, đơn giản hoá so với bản cũ để chạy qua service thật) ──
+  console.log('Tao du lieu qua khu (6 thang)...')
+
+  const roomTypeIds = [rtStd.id, rtDlx.id, rtPrm.id, rtSte.id, rtFam.id, rtSgl.id, rtTwn.id, rtStu.id, rtExe.id, rtPrs.id]
+
+  let pastBookingCount = 0
+  let pastReviewCount = 0
+
+  const comments = [
+    'Kỳ nghỉ tuyệt vời. Rất hài lòng!',
+    'Phòng sạch sẽ, nhân viên nhiệt tình. Sẽ quay lại.',
+    'Không gian sang trọng, đáng đồng tiền bát gạo.',
+    'View đẹp, bữa sáng ngon. Trải nghiệm rất tốt.',
+    'Tiện nghi đầy đủ, giường ngủ rất thoải mái.',
+    'Dịch vụ xuất sắc, quá trình check-in/out nhanh chóng.',
   ]
 
-  let pastBookingCount = 0;
-  let pastTotalRevenue = 0;
-  let pastReviewCount = 0;
-  
   for (let monthAgo = 6; monthAgo >= 1; monthAgo--) {
-    // Mỗi tháng trộn lại danh sách phòng để pick từ đầu, không bị trùng trong 1 tháng
-    const shuffledRooms = [...allRooms].sort(() => Math.random() - 0.5);
-    
-    // 26 checked_out bookings (đảm bảo mỗi phòng đều có đơn và review)
-    for (let i = 0; i < 26; i++) {
-      const roomObj = shuffledRooms[i];
-      const customer = customers[(monthAgo * 26 + i) % customers.length];
-      
-      const offsetStart = -28 + Math.floor(i * 0.8);
-      const checkIn = m(monthAgo, offsetStart);
-      const nights = (i % 3) + 1;
-      const checkOut = m(monthAgo, offsetStart + nights);
-      
-      const baseAmount = roomObj.price * nights;
-      let discountAmount = 0;
-      let appliedPromo = undefined;
-      
-      if (i % 4 === 0 && nights >= 2) {
-         discountAmount = 200000;
-         appliedPromo = promo2.id;
-      }
-      const totalAmount = Math.max(0, baseAmount - discountAmount);
-      
-      const b = await prisma.booking.create({ data: {
-        userId: customer.id, roomId: roomObj.r.id,
-        checkInDate: checkIn, checkOutDate: checkOut, guestCount: 2,
-        totalAmount, source: i % 4 === 0 ? 'offline' : 'online', 
-        status: 'checked_out', paidAt: m(monthAgo, offsetStart - 1),
-        createdBy: i % 4 === 0 ? r1.id : null,
-        promotionId: appliedPromo, discountAmount
-      }});
-      
-      await mkPay(b.id, totalAmount, i % 3 === 0 ? 'cash' : 'qr_code', 'success', 'booking', m(monthAgo, offsetStart - 1));
-      
-      if (i % 5 === 0) {
-        await prisma.booking.update({
-          where: { id: b.id },
-          data: {
-            extraTotal: 150000,
-            extraCharges: [{ label: 'Nước suối minibar', amount: 50000 }, { label: 'Phí giặt ủi', amount: 100000 }]
-          }
-        });
-        await mkPay(b.id, 150000, 'cash', 'success', 'booking', checkOut, undefined, `EXTRA-${b.id}-${Date.now()}-${i}`);
-        pastTotalRevenue += 150000;
-      }
-      
-      pastTotalRevenue += totalAmount;
-      pastBookingCount++;
-      
-      // Đánh giá cho tất cả các đơn hoàn thành (từ 4-5 sao)
-      const comments = [
-        `Kỳ nghỉ tuyệt vời vào tháng ${checkIn.getMonth() + 1}. Rất hài lòng!`,
-        'Phòng sạch sẽ, nhân viên nhiệt tình. Sẽ quay lại.',
-        'Không gian sang trọng, đáng đồng tiền bát gạo.',
-        'View đẹp, bữa sáng ngon. Trải nghiệm rất tốt.',
-        'Tiện nghi đầy đủ, giường ngủ rất thoải mái.',
-        'Dịch vụ xuất sắc, quá trình check-in/out nhanh chóng.',
-      ];
-      await prisma.review.create({ data: {
-        bookingId: b.id, userId: customer.id, rating: 4 + Math.floor(Math.random() * 2),
-        comment: comments[Math.floor(Math.random() * comments.length)]
-      }});
-      pastReviewCount++;
+    for (let i = 0; i < 18; i++) {
+      const customer = customers[(monthAgo * 18 + i) % customers.length]
+      const roomTypeId = roomTypeIds[i % roomTypeIds.length]
+      const offsetStart = -28 + i
+      const nights = (i % 3) + 1
+
+      const b = await seedBooking({
+        userId: customer.id,
+        items: [{ roomTypeId, quantity: 1 }],
+        checkIn: m(monthAgo, offsetStart),
+        checkOut: m(monthAgo, offsetStart + nights),
+        guestCount: 2,
+        target: 'checked_out',
+        createdBy: i % 4 === 0 ? r1.id : undefined,
+        method: i % 3 === 0 ? 'cash' : 'qr_code',
+        promoCode: i % 4 === 0 && nights >= 2 ? 'WELCOME' : undefined,
+        extra: i % 5 === 0 ? [{ label: 'Nước suối minibar', amount: 50000 }, { label: 'Phí giặt ủi', amount: 100000 }] : undefined,
+      })
+
+      await prisma.review.create({
+        data: {
+          bookingId: b.id, userId: customer.id,
+          rating: 4 + Math.floor(Math.random() * 2),
+          comment: comments[Math.floor(Math.random() * comments.length)],
+        },
+      })
+      pastBookingCount++
+      pastReviewCount++
     }
-    
-    // 3 cancelled bookings
-    for (let i = 26; i < 29; i++) {
-      const roomObj = shuffledRooms[i];
-      const customer = customers[(monthAgo * 29 + i) % customers.length];
-      
-      const offsetStart = -20 + (i - 26) * 5;
-      const checkIn = m(monthAgo, offsetStart);
-      const nights = 2;
-      const checkOut = m(monthAgo, offsetStart + nights);
-      
-      const totalAmount = roomObj.price * nights;
-      
-      const b = await prisma.booking.create({ data: {
-        userId: customer.id, roomId: roomObj.r.id,
-        checkInDate: checkIn, checkOutDate: checkOut, guestCount: 2,
-        totalAmount, source: 'online', status: 'cancelled',
-        paidAt: m(monthAgo, offsetStart - 5),
-        cancelledAt: m(monthAgo, offsetStart - 2), // Hủy sát ngày -> phạt 50%
-        cancelReason: 'Thay đổi lịch trình'
-      }});
-      
-      const half = totalAmount / 2;
-      await mkPay(b.id, totalAmount, 'qr_code', 'refunded', 'booking', m(monthAgo, offsetStart - 5), m(monthAgo, offsetStart - 2));
-      await mkPay(b.id, half, 'qr_code', 'refunded', 'refund', undefined, m(monthAgo, offsetStart - 1), `REFUND-${b.id}-${Date.now()}-${i}`);
-      await mkPay(b.id, half, 'qr_code', 'success', 'penalty', m(monthAgo, offsetStart - 2), undefined, `PENALTY-${b.id}-${Date.now()}-${i}`);
-      
-      pastTotalRevenue += half;
-      pastBookingCount++;
+
+    for (let i = 0; i < 3; i++) {
+      const customer = customers[(monthAgo * 3 + i) % customers.length]
+      const roomTypeId = roomTypeIds[(i + monthAgo) % roomTypeIds.length]
+      const offsetStart = -20 + i * 5
+
+      await seedBooking({
+        userId: customer.id,
+        items: [{ roomTypeId, quantity: 1 }],
+        checkIn: m(monthAgo, offsetStart),
+        checkOut: m(monthAgo, offsetStart + 2),
+        guestCount: 2,
+        target: 'cancelled',
+        cancelReason: 'Thay đổi lịch trình',
+      })
+      pastBookingCount++
     }
+
+    console.log(`   Thang -${monthAgo}: xong`)
   }
-  console.log(`Xong: ${pastBookingCount} bookings hien thi trong bao cao va nhieu danh gia`)
+
+  console.log(`Xong: ${pastBookingCount} bookings qua khu + ${pastReviewCount} danh gia`)
 
   // ════════════════════════════════════════════
   // 7. AUDIT LOGS
@@ -582,35 +602,39 @@ async function main() {
   // ════════════════════════════════════════════
   // TỔNG KẾT
   // ════════════════════════════════════════════
-  const totalRevenue = pastTotalRevenue + presentTotalRevenue;
+  const revenueAgg = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: { status: 'success', feeType: { in: ['booking', 'penalty'] } },
+  })
+  const totalRevenue = Number(revenueAgg._sum.amount ?? 0)
 
-  console.log('\nSEED HOAN TAT!\n' + '━'.repeat(58))
+  console.log(`\nSEED HOAN TAT!\n` + '━'.repeat(58))
   console.log('TONG KET:')
   console.log(`   Users:      16 (1 admin, 3 le tan, 12 khach hang)`)
   console.log(`   Amenities:  10 tien ich`)
   console.log(`   RoomTypes:  10 hang phong (da dang gia tien)`)
-  console.log(`   Rooms:      29 phong (599k -> 12M/dem)`)
+  console.log(`   Rooms:      29 phong`)
   console.log(`   Promotions: 10 ma khuyen mai`)
-  console.log(`   Bookings:   ~${pastBookingCount + 9} (trai dai 6 thang)`)
+  console.log(`   Bookings:   ~${pastBookingCount + 10} (trai dai 6 thang)`)
   console.log(`   Reviews:    ~${pastReviewCount} danh gia (4-5 sao)`)
   console.log(`   AuditLogs:  ~15 entries`)
-  console.log(`   Tong DT:    ${(totalRevenue/1000000).toFixed(1)}M VND (6 thang)`)
+  console.log(`   Tong DT:    ${(totalRevenue / 1000000).toFixed(1)}M VND (6 thang)`)
   console.log('━'.repeat(58))
 
-  console.log('\nTAI KHOAN:')
+  console.log(`\nTAI KHOAN:`)
   console.log('   Admin:   admin@hotel.com        / Admin@123')
   console.log('   Le tan:  receptionist@hotel.com / Recep@123 (+ 2 le tan khac)')
   console.log('   Khach:   customer@hotel.com     / Customer@123 (+ 11 khach khac)')
 
-  console.log('\nDEMO NGAY SAU SEED:')
-  console.log('   B01 -- Phong 203 DANG CO KHACH     -> Check-out')
-  console.log('   B02 -- Phong 301 NHAN PHONG NGAY MAI -> Check-in')
-  console.log('   B03 -- Phong 401 CHO THANH TOAN    -> QR + Simulate')
-  console.log('   B04 -- Don quay phong 801          -> Huy offline')
-  console.log('   B05 -- Huy 50% + PENDING REFUND    -> Xac nhan hoan tien')
-  console.log('   B06 -- Suite 601 14 ngay nua       -> Huy truoc 3 ngay (hoan 100%)')
+  console.log(`\nDEMO NGAY SAU SEED:`)
+  console.log('   B01 -- Da check-in                -&gt; demo Check-out')
+  console.log('   B02 -- Confirmed, chua gan phong cu the (gan luc check-in) -&gt; demo Check-in')
+  console.log('   B03 -- Cho thanh toan             -&gt; demo QR + Simulate')
+  console.log('   B04 -- Don quay, confirmed         -&gt; demo Huy offline')
+  console.log('   B05 -- Huy 50% + PENDING REFUND    -&gt; demo Xac nhan hoan tien')
+  console.log('   B06 -- Suite, xa ngay              -&gt; demo Huy truoc 3 ngay (hoan 100%)')
+  console.log('   B10 -- Nhieu phong (2 Deluxe + 1 Standard) -&gt; demo tinh nang gio hang')
   console.log(`   Reviews -- Da tu dong tao ~${pastReviewCount} danh gia tu cac khach hang cu`)
-  console.log('   Dashboard: 203=occupied 301=available 304=maintenance 103=cleaning')
   console.log('   Bao cao:   6 thang du lieu san sang')
 }
 

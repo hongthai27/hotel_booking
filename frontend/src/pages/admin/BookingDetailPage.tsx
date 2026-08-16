@@ -209,7 +209,7 @@ const BookingDetailPage = () => {
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelAdminBooking();
 
   const { mutate: confirmRefund, isPending: isConfirmingRefund } = useMutation({
-    mutationFn: (bookingId: number) => api.patch(`/admin/bookings/${bookingId}/confirm-refund`),
+    mutationFn: (paymentId: number) => api.patch(`/admin/payments/${paymentId}/confirm-refund`),
     onSuccess: () => {
       toast.success('Xác nhận hoàn tiền thành công');
       queryClient.invalidateQueries({ queryKey: ['admin-booking-detail', id] });
@@ -358,7 +358,7 @@ const BookingDetailPage = () => {
                   <button
                     onClick={() => {
                       if (window.confirm('Bạn xác nhận đã hoàn tiền cho khách hàng này?')) {
-                        confirmRefund(booking.id);
+                        confirmRefund(refundPayment.id);
                       }
                     }}
                     disabled={isConfirmingRefund}

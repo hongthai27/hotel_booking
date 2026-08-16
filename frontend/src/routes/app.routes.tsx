@@ -23,6 +23,8 @@ const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 const ComparePage = lazy(() => import('../pages/customer/ComparePage'));
 const PromotionsPage = lazy(() => import('../pages/customer/PromotionsPage'))
 const ContactPage = lazy(() => import('../pages/customer/ContactPage'))
+import CartPage from '../pages/customer/CartPage';
+import CheckoutPage from '../pages/customer/CheckoutPage';
 
 const DashboardPage = lazy(() => import('../pages/admin/DashboardPage'));
 const BookingListPage = lazy(() => import('../pages/admin/BookingListPage'));
@@ -91,9 +93,39 @@ const router = createBrowserRouter([
       { path: '/contact', element: <ContactPage /> },
       { path: 'room-type/:roomTypeId', element: <RoomDetailPage /> },
       { path: 'booking/:id', element: <BookingPage /> },
+      {
+        path: 'cart',
+        element: (
+          <ProtectedRoute roles={['customer']}>
+            <CartPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'checkout',
+        element: (
+          <ProtectedRoute roles={['customer']}>
+            <S><CheckoutPage /></S>
+          </ProtectedRoute>
+        ),
+      },
       { path: 'payment/:id', element: <PaymentPage /> },
-      { path: 'my-bookings', element: <MyBookingsPage /> },
-      { path: 'profile', element: <S><ProfilePage /></S> },
+      {
+        path: 'my-bookings',
+        element: (
+          <ProtectedRoute roles={['customer']}>
+            <MyBookingsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute roles={['customer']}>
+            <S><ProfilePage /></S>
+          </ProtectedRoute>
+        )
+      },
       { path: 'compare', element: <S><ComparePage /></S> },
       {
         path: 'bookings/:id',
@@ -107,14 +139,25 @@ const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: (
+      <ProtectedRoute roles={['admin', 'receptionist']}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'bookings', element: <BookingListPage /> },
       { path: 'bookings/:id', element: <BookingDetailPage /> },
       { path: 'room-types', element: <RoomTypeListPage /> },
-      { path: 'reports', element: <ReportPage /> },
+      {
+        path: 'reports',
+        element: (
+          <ProtectedRoute roles={['admin']}>
+            <ReportPage />
+          </ProtectedRoute>
+        )
+      },
       { path: 'refunds', element: <RefundListPage /> },
       {
         path: 'users',

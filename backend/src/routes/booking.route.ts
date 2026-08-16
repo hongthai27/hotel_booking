@@ -9,6 +9,8 @@ import {
   updateOfflineBookingSchema,
   getAllBookingsQuerySchema,
   createReviewSchema,
+  checkInMultipleSchema,
+  checkOutRoomSchema,
 } from '../validations/booking.schema';
 
 const router = Router();
@@ -85,13 +87,15 @@ router.patch(
   '/admin/bookings/:id/checkin',
   authenticateJWT,
   authorizeRole(['admin', 'receptionist']),
-  bookingController.checkIn
+  validateBody(checkInMultipleSchema),
+  bookingController.checkInMultiple
 );
 
 router.patch(
-  '/admin/bookings/:id/checkout',
+  '/admin/bookings/:id/rooms/:bookingRoomId/checkout',
   authenticateJWT,
   authorizeRole(['admin', 'receptionist']),
+  validateBody(checkOutRoomSchema),
   bookingController.checkOut
 );
 

@@ -356,26 +356,24 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
     s.toLowerCase() === 'cancelled'
   );
 
-  const availableRoomCondition: Prisma.RoomWhereInput = {
-    status: { notIn: excludedRoomStatuses },
-    bookings: {
-      none: {
+  // Đếm theo loại phòng — không còn khoá/kiểm tra từng phòng vật lý cụ thể nữa
+  const reservedByType = await prisma.bookingRoomType.groupBy({
+    by: ['roomTypeId'],
+    _sum: { quantity: true },
+    where: {
+      booking: {
         status: { notIn: excludedBookingStatuses },
-        AND: [
-          { checkInDate: { lt: checkOutDate } },
-          { checkOutDate: { gt: checkInDate } },
-        ],
+        checkInDate: { lt: checkOutDate },
+        checkOutDate: { gt: checkInDate },
       },
     },
-  };
+  });
+  const reservedMap = new Map(reservedByType.map((r) => [r.roomTypeId, r._sum.quantity ?? 0]));
 
   const results = await prisma.roomType.findMany({
     where: {
       maxCapacity: { gte: data.guests },
       ...priceFilter,
-      rooms: {
-        some: availableRoomCondition,
-      },
     },
     include: {
       amenities: {
@@ -386,7 +384,7 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
       },
       _count: {
         select: {
-          rooms: { where: availableRoomCondition },
+          rooms: { where: { status: { notIn: excludedRoomStatuses } } },
         },
       },
     },
@@ -401,9 +399,10 @@ export const searchAvailable = async (data: SearchAvailableDto) => {
       basePrice: Number(rt.basePrice),
       amenities: rt.amenities,
       images: rt.images,
-      availableRoomCount: rt._count.rooms,
+      availableRoomCount: rt._count.rooms - (reservedMap.get(rt.id) ?? 0),
       lowestPrice: Number(rt.basePrice),
     }))
+    .filter((rt) => rt.availableRoomCount > 0)
     .sort((a, b) => a.lowestPrice - b.lowestPrice);
 };
 
@@ -445,7 +444,7 @@ export const createRoom = async (data: RoomDto, actorId: number) => {
         roomNumber: data.roomNumber,
         floor: data.floor,
         status: data.status as RoomStatus,
-        currentPrice: roomType.basePrice,
+
         roomType: {
           connect: { id: data.roomTypeId }
         }
@@ -499,7 +498,7 @@ export const deleteRoom = async (id: number, actorId: number) => {
   const existing = await prisma.room.findUnique({
     where: { id },
     include: {
-      _count: { select: { bookings: true } },
+      _count: { select: { bookingRooms: true } },
     },
   });
 
@@ -507,7 +506,7 @@ export const deleteRoom = async (id: number, actorId: number) => {
     throw new AppError(404, 'Không tìm thấy phòng');
   }
 
-  if (existing._count.bookings > 0) {
+  if (existing._count.bookingRooms > 0) {
     throw new AppError(400, 'Không thể xóa phòng đã từng có lịch sử đặt phòng. Hãy đổi trạng thái sang Bảo trì hoặc Ngừng hoạt động.');
   }
 
@@ -548,14 +547,11 @@ export const updateRoomStatus = async (
       );
     }
     if (['maintenance', 'cleaning', 'out_of_order'].includes(newStatus)) {
-      const activeBooking = await tx.booking.findFirst({
-        where: {
-          roomId,
-          status: 'checked_in' as BookingStatus,
-        },
+      const activeAssignment = await tx.bookingRoom.findFirst({
+        where: { roomId, checkoutAt: null },
       });
 
-      if (activeBooking) {
+      if (activeAssignment) {
         throw new AppError(
           400,
           'Không thể vô hiệu hóa phòng đang có đơn đặt phòng'
@@ -732,37 +728,24 @@ export interface RoomOverview {
 
 export const getRoomOverview = async (): Promise<RoomOverview[]> => {
   try {
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-
     const rooms = await prisma.room.findMany({
       include: {
         roomType: {
-          select: { typeName: true, maxCapacity: true },
+          select: { typeName: true, maxCapacity: true, basePrice: true },
         },
-        bookings: {
-          where: {
-            OR: [
-              { status: 'checked_in' },
-              {
-                status: { in: ['confirmed', 'pending_payment'] },
-                checkInDate: { lte: todayEnd },
-                checkOutDate: { gt: todayStart },
-              }
-            ]
-          },
+        bookingRooms: {
+          where: { checkoutAt: null },
           select: {
-            id: true,
-            status: true,
-            checkInDate: true,
-            checkOutDate: true,
-            guestCount: true,
-            customer: { select: { fullName: true, phoneNumber: true } },
+            bookingId: true,
+            booking: {
+              select: {
+                checkInDate: true,
+                checkOutDate: true,
+                guestCount: true,
+                customer: { select: { fullName: true, phoneNumber: true } },
+              },
+            },
           },
-          orderBy: { checkInDate: 'asc' },
         },
       },
       orderBy: [{ floor: 'asc' }, { roomNumber: 'asc' }],
@@ -772,57 +755,35 @@ export const getRoomOverview = async (): Promise<RoomOverview[]> => {
       let finalStatus: RoomStatus | 'reserved' = room.status;
       let guestInfo: RoomGuestOverview | null = null;
 
-      const activeBooking = room.bookings.find((b) => b.status === 'checked_in');
+      const activeAssignment = room.bookingRooms[0];
 
-      const upcomingBooking = room.bookings.find(
-        (b) => ['confirmed', 'pending_payment'].includes(b.status) && 
-               b.id !== activeBooking?.id
-      );
-
-      if (activeBooking) {
+      if (activeAssignment) {
         finalStatus = 'occupied';
-        const isOverdue = now > new Date(activeBooking.checkOutDate);
+        const isOverdue = new Date() > new Date(activeAssignment.booking.checkOutDate);
 
         guestInfo = {
-          bookingId: activeBooking.id,
-          guestName: activeBooking.customer?.fullName ?? 'Khách',
-          guestPhone: activeBooking.customer?.phoneNumber ?? '—',
-          checkInDate: activeBooking.checkInDate,
-          checkOutDate: activeBooking.checkOutDate,
-          guestCount: activeBooking.guestCount,
+          bookingId: activeAssignment.bookingId,
+          guestName: activeAssignment.booking.customer?.fullName ?? 'Khách',
+          guestPhone: activeAssignment.booking.customer?.phoneNumber ?? '—',
+          checkInDate: activeAssignment.booking.checkInDate,
+          checkOutDate: activeAssignment.booking.checkOutDate,
+          guestCount: activeAssignment.booking.guestCount,
           isUpcoming: false,
           isOverdue,
         };
-        
-      } else {
-        if (room.status === 'occupied') {
-          finalStatus = 'cleaning';
-        }
-        
-        if (upcomingBooking) {
-          if (finalStatus === 'available') {
-            finalStatus = 'reserved';
-          }
-          
-          guestInfo = {
-            bookingId: upcomingBooking.id,
-            guestName: upcomingBooking.customer?.fullName ?? 'Khách',
-            guestPhone: upcomingBooking.customer?.phoneNumber ?? '—',
-            checkInDate: upcomingBooking.checkInDate,
-            checkOutDate: upcomingBooking.checkOutDate,
-            guestCount: upcomingBooking.guestCount,
-            isUpcoming: true,
-            isOverdue: false,
-          };
-        }
+      } else if (room.status === 'occupied') {
+        finalStatus = 'cleaning';
       }
+      // Bỏ phần "sắp có khách / reserved": phòng vật lý giờ chỉ gắn với booking cụ thể lúc check-in,
+      // nên không còn cách biết trước "booking nào sẽ dùng đúng phòng này". Muốn xem nhu cầu sắp tới
+      // thì cần màn hình riêng theo LOẠI phòng (dùng searchAvailable), không phải theo từng phòng.
 
       return {
         roomId: room.id,
         roomNumber: room.roomNumber,
         floor: room.floor ?? 1,
         status: finalStatus,
-        currentPrice: Number(room.currentPrice),
+        currentPrice: Number(room.roomType.basePrice),
         typeName: room.roomType.typeName,
         maxCapacity: room.roomType.maxCapacity,
         currentGuest: guestInfo,

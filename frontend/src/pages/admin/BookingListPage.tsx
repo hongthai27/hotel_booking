@@ -128,7 +128,7 @@ const CreateOfflineBookingModal = ({ onClose }: { onClose: () => void }) => {
     if (!validateForm()) return;
     createOffline({
       ...(isNewCustomer ? { newCustomer: { fullName: newName, phoneNumber: newPhone } } : { userId: selectedUser.id }),
-      roomId: selectedRoomId,
+      items: [{ roomTypeId: selectedRoomId!, quantity: 1 }],
       checkInDate: checkIn,
       checkOutDate: checkOut,
       guestCount: guests,

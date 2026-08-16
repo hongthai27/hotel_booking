@@ -78,33 +78,42 @@ export const getRevenueReport = async (from: string, to: string) => {
       ? Math.round((usedNights / (totalRooms * totalDays)) * 10000) / 100
       : 0;
 
-  const paymentsWithRoomType = await prisma.payment.findMany({
+  const byRoomTypeRaw = await prisma.paymentAllocation.groupBy({
+    by: ['roomTypeName'],
+    _sum: {
+      amount: true,
+    },
     where: {
-      status: 'success',
-      paidAt: {
-        gte: fromDate,
-        lte: toDate,
+      payment: {
+        OR: [
+          {
+            status: 'success',
+            paidAt: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+          {
+            status: 'refunded',
+            refundedAt: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+        ],
       },
     },
-    select: {
-      amount: true,
-      booking: {
-        select: {
-          room: { select: { roomType: { select: { typeName: true } } } },
-        },
+    orderBy: {
+      _sum: {
+        amount: 'desc',
       },
     },
   });
 
-  const roomTypeMap: Record<string, number> = {};
-  for (const payment of paymentsWithRoomType) {
-    const typeName = payment.booking?.room?.roomType?.typeName || 'Chưa xếp phòng';
-    roomTypeMap[typeName] = (roomTypeMap[typeName] || 0) + Number(payment.amount);
-  }
-
-  const byRoomType = Object.entries(roomTypeMap)
-    .map(([name, revenue]) => ({ name, revenue }))
-    .sort((a, b) => b.revenue - a.revenue);
+  const byRoomType = byRoomTypeRaw.map((item) => ({
+    name: item.roomTypeName,
+    revenue: Number(item._sum.amount),
+  }));
 
   return {
     summary: {
@@ -140,7 +149,7 @@ export const getRefundList = async () => {
               phoneNumber: true,
             },
           },
-          room: {
+          roomTypeLines: {
             include: {
               roomType: {
                 select: { typeName: true },

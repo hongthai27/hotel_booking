@@ -26,10 +26,42 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface BookingRoomTypeLine {
+  id: number;
+  roomTypeId: number;
+  quantity: number;
+  priceAtBooking: number;
+  roomType: {
+    id: number;
+    typeName: string;
+    basePrice: number;
+    images?: { imageUrl: string; displayOrder: number }[];
+  };
+}
+
+export interface AssignedRoom {
+  id: number;
+  roomId: number;
+  checkinAt: string;
+  checkoutAt?: string | null;
+  idNumber?: string | null;
+  checkinNote?: string | null;
+  extraCharges?: { label: string; amount: number }[] | null;
+  room: {
+    id: number;
+    roomNumber: string;
+    floor?: number;
+    roomType: {
+      id: number;
+      typeName: string;
+      basePrice: number;
+    };
+  };
+}
+
 export interface Booking {
   id: number;
   userId: number;
-  roomId: number;
   createdBy?: number;
   checkInDate: string;
   checkOutDate: string;
@@ -44,20 +76,8 @@ export interface Booking {
   createdAt: string;
   updatedAt: string;
   review?: Review | null;
-  room?: {
-    id: number;
-    roomNumber: string;
-    floor?: number;
-    roomType: {
-      id: number;
-      typeName: string;
-      basePrice: number;
-      images: {
-        imageUrl: string;
-        displayOrder: number;
-      }[];
-    };
-  };
+  roomTypeLines: BookingRoomTypeLine[];
+  assignedRooms: AssignedRoom[];
   payments?: Payment[];
 }
 export interface Review {

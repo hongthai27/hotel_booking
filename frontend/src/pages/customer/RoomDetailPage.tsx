@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useRoomTypeDetail } from '../../hooks/queries/use-hotels.query';
+import { useRoomTypeDetail, useAvailableRooms } from '../../hooks/queries/use-hotels.query';
 import { useAuthStore } from '../../stores/authStore';
 import { useSearchStore } from '../../stores/searchStore';
 import { ReviewList } from '../../components/customer/ReviewList';
+import { useCartStore } from '../../stores/cartStore';
 
 const PLACEHOLDER = 'https://placehold.co/800x500?text=No+Image';
 
@@ -43,9 +44,20 @@ const RoomDetailPage = () => {
     Number(roomTypeId)
   );
 
+  const { data: availableRooms, isSuccess: availabilityLoaded } = useAvailableRooms({
+    checkIn, checkOut, guests: Number(guests),
+  });
+
+  const matched = availableRooms?.find((r) => r.id === Number(roomTypeId));
+  const liveAvailableCount = matched?.availableRoomCount ?? (availabilityLoaded ? 0 : undefined);
+  const maxQuantity = Math.min(liveAvailableCount ?? 1, 10); // 10 = giới hạn cứng của backend (bookingItemSchema)
+
+  const [quantity, setQuantity] = useState(1);
+  useEffect(() => { setQuantity(1); }, [roomTypeId, checkIn, checkOut]); // reset khi đổi phòng/ngày
+
   const nights = calcNights(checkIn, checkOut);
   const basePrice = Number(roomType?.basePrice ?? 0);
-  const total = nights * basePrice;
+  const total = nights * basePrice * quantity;
 
   // 8. Không crash nếu thiếu ảnh & Sắp xếp theo displayOrder
   const images =
@@ -60,21 +72,41 @@ const RoomDetailPage = () => {
   const handleNext = () =>
     setActiveIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
 
+  const { items, checkIn: cartCheckIn, clearCart, addToCart, setBookingDetails } = useCartStore();
+
   const handleBook = () => {
     if (!checkIn || !checkOut || nights <= 0) {
       alert('Vui lòng chọn ngày nhận và trả phòng ở trang chủ trước khi đặt!');
       return;
     }
-
     if (!user) {
-      navigate(
-        `/login?redirect=/booking/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`
+      const redirect = encodeURIComponent(
+        `/room-type/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`
       );
+      navigate(`/login?redirect=${redirect}`);
       return;
     }
-    navigate(
-      `/booking/${roomTypeId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`
+    if (!roomType || liveAvailableCount === 0) return;
+
+    if (items.length > 0 && cartCheckIn && checkIn &&
+      cartCheckIn.toISOString().split('T')[0] !== checkIn) {
+      if (!window.confirm('Giỏ hàng đang có phòng cho ngày khác. Thêm phòng này sẽ xoá giỏ hàng cũ, tiếp tục?')) return;
+      clearCart();
+    }
+
+    setBookingDetails({ checkIn: new Date(checkIn), checkOut: new Date(checkOut), guests: Number(guests) });
+    addToCart(
+      {
+        id: roomType.id,
+        typeName: roomType.typeName,
+        basePrice: Number(roomType.basePrice),
+        maxCapacity: roomType.maxCapacity,
+        availableRoomCount: liveAvailableCount ?? roomType.availableRoomCount, // dùng số thực tế thay vì undefined
+        images: roomType.images,
+      },
+      quantity
     );
+    navigate('/cart');
   };
 
   // ── Loading ──
@@ -266,6 +298,19 @@ const RoomDetailPage = () => {
                   <span className="text-gray-500">Số khách</span>
                   <span className="text-gray-800 font-medium">{guests} khách</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Số lượng phòng</span>
+                  <div className="flex items-center border border-gray-200 rounded-lg">
+                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}
+                      className="px-2.5 py-1 text-gray-500 hover:text-primary disabled:text-gray-300">-</button>
+                    <span className="w-8 text-center font-medium text-gray-800">{quantity}</span>
+                    <button onClick={() => setQuantity(q => Math.min(maxQuantity, q + 1))} disabled={quantity >= maxQuantity}
+                      className="px-2.5 py-1 text-gray-500 hover:text-primary disabled:text-gray-300">+</button>
+                  </div>
+                </div>
+                {liveAvailableCount !== undefined && (
+                  <p className="text-xs text-gray-400 text-right -mt-2">Còn {liveAvailableCount} phòng trống</p>
+                )}
                 <hr className="border-gray-200 my-1" />
                 <div className="flex justify-between items-center font-semibold text-base">
                   <span className="text-gray-800">Tổng cộng</span>
@@ -282,9 +327,10 @@ const RoomDetailPage = () => {
             <div className="flex flex-col gap-2">
               <button
                 onClick={handleBook}
-                className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-xl border-none cursor-pointer transition-all active:scale-[0.98] shadow-sm hover:shadow-md"
+                disabled={liveAvailableCount === 0}
+                className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-xl border-none cursor-pointer transition-all active:scale-[0.98] shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {user ? 'Đặt phòng ngay' : 'Đăng nhập để đặt phòng'}
+                {!user ? 'Đăng nhập để đặt phòng' : liveAvailableCount === 0 ? 'Hết phòng' : 'Đặt phòng ngay'}
               </button>
               
               {!user && (

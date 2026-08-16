@@ -77,22 +77,31 @@ export const getRefundPreview = catchAsync(async (req: Request, res: Response) =
   successResponse(res, data, 'Xem trước chính sách hoàn tiền');
 });
 
-export const checkIn = catchAsync(async (req: Request, res: Response) => {
-  const result = await bookingService.checkIn(
-    Number(req.params.id),
-    req.user!.userId,
+export const checkInMultiple = catchAsync(async (req: Request, res: Response) => {
+  // 1. Controller chỉ làm nhiệm vụ bóc tách Request
+  const bookingId = Number(req.params.id);
+  const staffId = req.user!.userId; // Lấy ID của lễ tân đang đăng nhập
+  
+  // 2. Chuyển toàn bộ Payload (req.body) xuống cho Service xử lý
+  const result = await bookingService.checkInMultiple(
+    bookingId,
+    staffId,
     {
+      assignments: req.body.assignments, // Mảng các phòng cần gán
       idNumber: req.body.idNumber,
       checkinNote: req.body.checkinNote,
     }
   );
-  successResponse(res, result, 'Check-in thành công');
+
+  // 3. Định dạng Response trả về cho Frontend
+  successResponse(res, result, 'Check-in thành công cho tất cả các phòng');
 });
 
 export const checkOut = catchAsync(async (req: Request, res: Response) => {
   const result = await bookingService.checkOut(
     Number(req.params.id),
     req.user!.userId,
+    Number(req.params.bookingRoomId),
     req.body.extraCharges ?? [],
     req.body.paymentMethod
   );

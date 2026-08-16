@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { useNavigate, useSearchParams, Link, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';                    // đổi từ 'react-hot-toast'
+import { GoogleLogin } from '@react-oauth/google';  // MỚI
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -14,10 +15,17 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginLocationState = {
+  from?: {
+    pathname: string;
+    search?: string;
+  };
+};
 
 const LoginPage: React.FC = () => {
-  const { login } = useAuthStore();
+  const { login, loginWithGoogle } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   
   const [showPassword, setShowPassword] = useState(false);
@@ -32,30 +40,55 @@ const LoginPage: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
 
+  const redirectAfterLogin = () => {
+    const currentUser = useAuthStore.getState().user;
+    const locationState = location.state as LoginLocationState | null;
+    const encodedRedirectPath = searchParams.get('redirect') || searchParams.get('returnUrl');
+    const redirectPath =
+      (encodedRedirectPath ? decodeURIComponent(encodedRedirectPath) : null) ||
+      (locationState?.from
+        ? `${locationState.from.pathname}${locationState.from.search ?? ''}`
+        : null);
+
+    if (redirectPath) {
+      navigate(redirectPath, { replace: true });
+      return;
+    }
+
+    if (currentUser?.role === 'admin' || currentUser?.role === 'receptionist') {
+      navigate('/admin/bookings', { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
+  };
+
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setIsSubmitting(true);
-      setLoginError(''); 
-      
+      setLoginError('');
       await login(data.identifier, data.password);
-      
-      const currentUser = useAuthStore.getState().user;
-      const redirectPath = searchParams.get('redirect') || searchParams.get('returnUrl');
-      
-      if (redirectPath) {
-        navigate(redirectPath, { replace: true });
-        return;
-      }
-
-      if (currentUser?.role === 'admin' || currentUser?.role === 'receptionist') {
-        navigate('/admin/bookings', { replace: true });
-      } else {
-        navigate('/', { replace: true }); 
-      }
-      
+      redirectAfterLogin();
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+      setLoginError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
+  const handleGoogleSuccess = async (credential?: string) => {
+    if (!credential) {
+      toast.error('Không nhận được thông tin xác thực từ Google');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setLoginError('');
+      await loginWithGoogle(credential);
+      redirectAfterLogin();
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 'Đăng nhập Google thất bại.';
       setLoginError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -150,6 +183,24 @@ const LoginPage: React.FC = () => {
           )}
         </button>
       </form>
+
+      <div className="flex items-center gap-3 my-6">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400 font-medium">HOẶC</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      <div className="flex justify-center">
+        <GoogleLogin
+          onSuccess={(res) => handleGoogleSuccess(res.credential)}
+          onError={() => toast.error('Đăng nhập Google thất bại')}
+          theme="outline"
+          shape="rectangular"
+          size="large"
+          text="continue_with"
+          width="320"
+        />
+      </div>
 
       <div className="mt-6 text-center text-sm text-gray-600">
         Chưa có tài khoản?{' '}

@@ -21,20 +21,20 @@ const guestCountSchema = z
   .min(1, 'Số lượng khách phải ít nhất là 1')
   .max(MAX_GUESTS, `Số lượng khách tối đa là ${MAX_GUESTS} người`);
 
-const roomIdSchema = z
-  .number({ required_error: 'Mã phòng là bắt buộc' })
-  .int('Mã phòng phải là số nguyên')
-  .min(1, 'Mã phòng không hợp lệ');
-
 const checkDateRange = (d: { checkInDate: string; checkOutDate: string }) => {
   const diffMs = new Date(d.checkOutDate).getTime() - new Date(d.checkInDate).getTime();
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   return diffDays <= MAX_STAY_DAYS;
 };
 
+const bookingItemSchema = z.object({
+  roomTypeId: z.coerce.number().int().min(1, 'Loại phòng không hợp lệ'),
+  quantity: z.coerce.number().int().min(1, 'Số lượng phải ít nhất là 1').max(10, 'Tối đa 10 phòng mỗi loại'),
+});
+
 export const createBookingSchema = z
   .object({
-    roomId: z.coerce.number().int().min(1),
+    items: z.array(bookingItemSchema).min(1, 'Giỏ hàng trống, chọn ít nhất 1 phòng'),
     checkInDate: z.string().min(1, 'Vui lòng chọn ngày nhận phòng'),
     checkOutDate: z.string().min(1, 'Vui lòng chọn ngày trả phòng'),
     guestCount: z.coerce.number().int().min(1).max(MAX_GUESTS),
@@ -67,7 +67,7 @@ export const createOfflineBookingSchema = z
         phoneNumber: z.string({ required_error: 'Số điện thoại là bắt buộc' }),
       })
       .optional(),
-    roomId: roomIdSchema,
+    items: z.array(bookingItemSchema).min(1, 'Giỏ hàng trống, chọn ít nhất 1 phòng'),
     checkInDate: checkInDateSchema,
     checkOutDate: checkOutDateSchema,
     guestCount: guestCountSchema,
@@ -147,3 +147,31 @@ export const createReviewSchema = z.object({
 });
 
 export type CreateReviewDto = z.infer<typeof createReviewSchema>;
+
+export const checkInSingleRoomSchema = z.object({
+  bookingRoomTypeId: z.coerce.number().int().min(1, 'Thiếu thông tin loại phòng cần check-in'),
+  roomId: z.coerce.number().int().min(1, 'Vui lòng chọn phòng để check-in'),
+  idNumber: z.string().optional(),
+  checkinNote: z.string().optional(),
+});
+
+export const checkOutRoomSchema = z.object({
+  extraCharges: z
+    .array(z.object({ label: z.string(), amount: z.coerce.number().min(0) }))
+    .optional(),
+  paymentMethod: z.enum(['cash', 'card', 'qr_code']).optional(),
+});
+
+export type CheckInSingleRoomDto = z.infer<typeof checkInSingleRoomSchema>;
+export type CheckOutRoomDto = z.infer<typeof checkOutRoomSchema>;
+
+export const checkInMultipleSchema = z.object({
+  idNumber: z.string().optional(),
+  checkinNote: z.string().optional(),
+  assignments: z.array(z.object({
+    bookingRoomTypeId: z.coerce.number().int().min(1),
+    roomId: z.coerce.number().int().min(1),
+  })).min(1, 'Phải có ít nhất một phòng được gán'),
+});
+
+export type CheckInMultipleDto = z.infer<typeof checkInMultipleSchema>;

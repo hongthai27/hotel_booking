@@ -16,6 +16,11 @@ export const login = catchAsync(async (req: Request, res: Response) => {
   successResponse(res, result, 'Đăng nhập thành công');
 });
 
+export const googleLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await authService.googleLogin(req.body.credential);
+  successResponse(res, result, 'Đăng nhập bằng Google thành công');
+});
+
 export const getMe = catchAsync(async (req: Request, res: Response) => {
   const user = await authService.getMe(req.user!.userId);
   successResponse(res, user, 'Lấy thông tin người dùng thành công');

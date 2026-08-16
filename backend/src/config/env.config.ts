@@ -30,6 +30,19 @@ const envSchema = z.object({
     .string()
     .default('7d'),
 
+  // Google OAuth — MỚI
+  GOOGLE_CLIENT_ID: z
+    .string({ required_error: 'GOOGLE_CLIENT_ID là bắt buộc' })
+    .min(1, 'GOOGLE_CLIENT_ID không được để trống'),
+
+  GOOGLE_CLIENT_SECRET: z
+    .string({ required_error: 'GOOGLE_CLIENT_SECRET là bắt buộc' })
+    .min(1, 'GOOGLE_CLIENT_SECRET không được để trống'),
+
+  GOOGLE_REDIRECT_URI: z
+    .string({ required_error: 'GOOGLE_REDIRECT_URI là bắt buộc' })
+    .url('GOOGLE_REDIRECT_URI phải là URL hợp lệ'),
+
   // Cloudinary
   CLOUDINARY_CLOUD_NAME: z
     .string({ required_error: 'CLOUDINARY_CLOUD_NAME là bắt buộc' })

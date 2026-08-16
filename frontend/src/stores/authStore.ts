@@ -10,6 +10,7 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;  // MỚI
   register: (data: RegisterDTO) => Promise<void>;
   logout: () => void;
   getMe: () => Promise<void>;
@@ -28,6 +29,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: data.user, token: data.token });
 
     // Kết nối socket sau khi login thành công
+    socketService.connect(data.user.role);
+  },
+
+  loginWithGoogle: async (credential: string) => {
+    const data = await authService.googleLogin(credential);
+    localStorage.setItem(TOKEN_KEY, data.token);
+    set({ user: data.user, token: data.token });
+
     socketService.connect(data.user.role);
   },
 
@@ -57,6 +66,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token, isLoading: true });
     try {
       await get().getMe();
+      const role = useAuthStore.getState().user?.role;
+      if (role) socketService.connect(role); // THÊM
     } catch (error) {
       localStorage.removeItem(TOKEN_KEY);
       set({ token: null, user: null });

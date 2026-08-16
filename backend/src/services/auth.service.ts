@@ -10,8 +10,17 @@ import { RegisterDto, LoginDto } from '../validations/auth.schema';
 import { createAuditLog } from '../utils/audit-log.util';
 import { sendResetPasswordEmail } from '../utils/email.util';
 import { env } from '../config/env.config';
+import { OAuth2Client } from 'google-auth-library';
 
 const SALT_ROUNDS = 10;
+
+// Google OAuth — MỚI
+const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
+
+// Sentinel cho tài khoản chỉ đăng nhập bằng Google (không có mật khẩu thật).
+// Cùng cơ chế với 'OFFLINE_NO_LOGIN' đã dùng cho khách offline, để tránh
+// phải đổi passwordHash sang nullable.
+const GOOGLE_NO_PASSWORD = 'GOOGLE_OAUTH_NO_PASSWORD';
 
 const excludePassword = (user: { passwordHash: string; [key: string]: unknown }) => {
   const { passwordHash, ...safeUser } = user;
@@ -66,10 +75,77 @@ export const login = async (data: LoginDto) => {
     throw new AppError(403, 'Tài khoản của bạn hiện đang bị khóa');
   }
 
+  // MỚI: chặn sớm trước khi gọi bcrypt.compare với sentinel string
+  if (user.passwordHash === GOOGLE_NO_PASSWORD) {
+    throw new AppError(400, 'Tài khoản này được tạo bằng Google. Vui lòng đăng nhập bằng Google.');
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isPasswordValid) {
     throw new AppError(401, 'Mật khẩu không chính xác');
+  }
+
+  const token = generateToken({ userId: user.id, role: user.role });
+
+  return {
+    token,
+    user: excludePassword(user),
+  };
+};
+
+export const googleLogin = async (credential: string) => {
+  let payload;
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: env.GOOGLE_CLIENT_ID,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    throw new AppError(401, 'Xác thực Google thất bại hoặc đã hết hạn');
+  }
+
+  if (!payload?.email) {
+    throw new AppError(400, 'Không lấy được email từ tài khoản Google');
+  }
+  if (!payload.email_verified) {
+    throw new AppError(400, 'Email Google chưa được xác thực');
+  }
+
+  const email = payload.email.toLowerCase();
+
+  let user = await prisma.user.findUnique({ where: { googleId: payload.sub } });
+
+  if (!user) {
+    // Chưa từng đăng nhập Google -> thử gộp theo email (nếu đã có tài khoản thường)
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+
+    if (existingByEmail) {
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: {
+          googleId: payload.sub,
+          avatarUrl: existingByEmail.avatarUrl ?? payload.picture,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          fullName: payload.name || email.split('@')[0],
+          email,
+          googleId: payload.sub,
+          avatarUrl: payload.picture,
+          passwordHash: GOOGLE_NO_PASSWORD,
+          role: 'customer',
+        },
+      });
+    }
+  }
+
+  if (user.status === 'inactive') {
+    throw new AppError(403, 'Tài khoản của bạn hiện đang bị khóa');
   }
 
   const token = generateToken({ userId: user.id, role: user.role });
@@ -205,25 +281,33 @@ export const forgotPassword = async (email: string): Promise<void> => {
     where: { email: email.toLowerCase() },
   });
 
-  if (!user) return;
+  if (!user) return; // Bảo mật: Không báo lỗi nếu email không tồn tại để chống dò quét email
 
-  const token = crypto.randomBytes(32).toString('hex');
-  const expiry = new Date(Date.now() + 15 * 60 * 1000);
+  // 1. Tạo Token gốc (Gửi cho user)
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  
+  // 2. Tạo Hashed Token (Lưu vào DB)
+  // Giải thích dòng này: Dùng thuật toán sha256 -> đưa resetToken vào -> xuất ra chuỗi dạng hex
+  const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  
+  const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
 
+  // 3. Lưu chuỗi ĐÃ BĂM vào database
   await prisma.user.update({
     where: { id: user.id },
-    data: { resetToken: token, resetTokenExpiry: expiry },
+    data: { resetToken: hashedToken, resetTokenExpiry: expiry },
   });
 
-  const resetLink = `${env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
-
+  // 4. Gửi URL chứa chuỗi GỐC (resetToken) cho User qua email
+  const resetLink = `${env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
   await sendResetPasswordEmail(user.email, user.fullName, resetLink);
 };
 
 export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
   const user = await prisma.user.findFirst({
     where: {
-      resetToken: token,
+      resetToken: hashedToken,
       resetTokenExpiry: { gt: new Date() },
     },
   });
